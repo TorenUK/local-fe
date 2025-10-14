@@ -1,4 +1,27 @@
-# Welcome to your Expo app 👋
+# Local Safety & Incident Reporting App
+
+---
+
+## 🚨 Features
+
+- **Real-time Reports** — Users can report incidents such as:
+  - Crimes and suspicious activity  
+  - Missing pets or people  
+  - Stolen vehicles or personal items  
+  - Road hazards and local disruptions
+
+- **Live Map View** — Browse nearby reports or expand your search radius to view incidents across towns and cities.
+
+- **Radius Control** — Choose how far around you to search — from your street to the entire region.
+
+- **Personal Tracking** — Register and track your personal belongings (e.g. phones, bikes, cars) within the app.
+
+- **Anonymous Reporting** — Submit reports without sharing personal details for privacy and safety.
+
+- **Notifications & Alerts** — Get notified when new reports appear in your selected area.
+
+---
+
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
