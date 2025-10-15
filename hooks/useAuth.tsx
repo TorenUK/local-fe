@@ -11,6 +11,8 @@ interface AuthContextType {
   userProfile: UserProfile | null;
   loading: boolean;
   isAuthenticated: boolean;
+  isLoggedIn: boolean;
+  setIsLoggedIn?: (value: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -18,12 +20,14 @@ const AuthContext = createContext<AuthContextType>({
   userProfile: null,
   loading: true,
   isAuthenticated: false,
+  isLoggedIn: false,
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeToAuthState(async (firebaseUser) => {
@@ -54,6 +58,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         userProfile,
         loading,
         isAuthenticated: user !== null,
+        isLoggedIn,
+      setIsLoggedIn,
       }}
     >
       {children}
