@@ -57,8 +57,8 @@ useEffect(() => {
   }
 
   const redCirclePosition = {
-    latitude: region.latitude + 0.009, // ~1km north
-    longitude: region.longitude,
+    latitude: region.latitude + 0.0032, 
+    longitude: region.longitude + 0.009,
   };
 
 
