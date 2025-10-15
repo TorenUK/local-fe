@@ -1,0 +1,26 @@
+@startuml architecture
+actor User
+rectangle "React Native App (Expo)" {
+  component "Auth Module" as Auth
+  component "Map UI" as MapUI
+  component "Report Manager" as ReportMgr
+  component "Notification Manager" as NotifMgr
+}
+
+rectangle "Firebase" {
+  database "Firestore" as FS
+  database "Storage" as ST
+  component "Cloud Functions" as CF
+  component "FCM" as FCM
+}
+
+User --> Auth : Login/Register
+User --> MapUI : View/Filter Reports
+User --> ReportMgr : Create/Track Reports
+MapUI --> FS : Listen for report updates
+ReportMgr --> FS : Add/Update Report
+ReportMgr --> ST : Upload Photos
+FS --> CF : Trigger geo-based notifications
+CF --> FCM : Send push notifications
+NotifMgr --> FCM : Receive notifications
+@enduml
