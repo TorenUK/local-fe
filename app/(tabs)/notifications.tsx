@@ -1,85 +1,37 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
-import { Platform, StyleSheet } from "react-native";
+import {
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
 
-export default function TabsLayout() {
+export default function NotificationsScreen() {
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: "#007AFF",
-        tabBarInactiveTintColor: "#8E8E93",
-        tabBarStyle: {
-          backgroundColor: "#fff",
-          borderTopWidth: 1,
-          borderTopColor: "#E5E5EA",
-          paddingTop: 8,
-          paddingBottom: Platform.OS === "ios" ? 20 : 8,
-          height: Platform.OS === "ios" ? 88 : 64,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: "600",
-        },
-        headerStyle: {
-          backgroundColor: "#fff",
-          elevation: 0,
-          shadowOpacity: 0,
-          borderBottomWidth: 1,
-          borderBottomColor: "#E5E5EA",
-        },
-        headerTitleStyle: {
-          fontWeight: "bold",
-          fontSize: 18,
-        },
-      }}
-    >
-            <Tabs.Screen
-        name="index"
-        options={{
-          title: "Map",
-          header: () => null, 
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "map" : "map-outline"}
-              size={size}
-              color={color}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          header: () => null,
-          title: "Profile",
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "person" : "person-outline"}
-              size={size}
-              color={color}
-            />
-          ),
-          headerTitle: "My Profile",
-        }}
-      />
-      <Tabs.Screen
-        name="notifications"
-        options={{
-          header: () => null,
-          title: "Notifications",
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "notifications" : "notifications-outline"}
-              size={size}
-              color={color}
-            />
-          ),
-          headerTitle: "Notifications",
-          tabBarBadge: 3, 
-        }}
-      />
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.emptyState}>
+        <Ionicons name="notifications-outline" size={64} color="#ccc" />
+        <Text style={styles.emptyStateText}>No notifications</Text>
+        <Text style={styles.emptyStateSubtext}>
+          You'll see alerts about nearby incidents here
+        </Text>
+      </View>
 
-    </Tabs>
+      {/* Notification Settings Quick Access */}
+      <TouchableOpacity style={styles.settingsCard}>
+        <View style={styles.settingsLeft}>
+          <Ionicons name="settings-outline" size={24} color="#007AFF" />
+          <View>
+            <Text style={styles.settingsTitle}>Notification Settings</Text>
+            <Text style={styles.settingsSubtitle}>
+              Manage your alert preferences
+            </Text>
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
