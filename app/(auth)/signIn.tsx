@@ -179,7 +179,7 @@ export default function SignInScreen() {
       setLoading(true);
       setIsLoggedIn(true);
     }
-    router.replace("/map");
+    router.replace("/(tabs)");
     setLoading(false);
   };
 
@@ -188,7 +188,7 @@ export default function SignInScreen() {
       setLoading(true);
       setIsLoggedIn(true);
     }
-    router.replace("/map");
+    router.replace("/(tabs)");
     setLoading(false);
   };
 
