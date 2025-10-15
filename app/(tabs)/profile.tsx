@@ -122,12 +122,15 @@ export default function ProfileScreen() {
     return (
       <View style={styles.container}>
         <Text>Please sign in</Text>
+                    <TouchableOpacity style={styles.backButton} onPress={() => router.push('/(auth)/signIn')}>
+              <Text style={styles.backButtonText}>Sign in</Text>
+            </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView  contentContainerStyle={styles.content}>
       {/* Profile Header */}
       <View style={styles.header}>
         <View style={styles.avatarContainer}>
@@ -850,8 +853,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+    backButton: {
+        margin: 10,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
   content: {
     paddingBottom: 40,
+    // paddingTop: 40,
   },
   header: {
     backgroundColor: '#fff',

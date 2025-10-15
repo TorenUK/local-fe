@@ -78,6 +78,20 @@ export default function TabsLayout() {
           tabBarBadge: 3, 
         }}
       />
+      <Tabs.Screen
+        name="create"
+        options={{
+          header: () => null,
+          title: "Create",
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? "add" : "add-outline"}
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
 
     </Tabs>
   );

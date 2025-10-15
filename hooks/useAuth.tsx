@@ -1,10 +1,16 @@
-import { User } from 'firebase/auth';
-import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { User } from "firebase/auth";
+import {
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import {
   getUserProfile,
   subscribeToAuthState,
-  UserProfile
-} from '../services/auth';
+  UserProfile,
+} from "../services/auth";
 
 interface AuthContextType {
   user: User | null;
@@ -13,6 +19,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoggedIn: boolean;
   setIsLoggedIn?: (value: boolean) => void;
+  mockLogout?: () => void;
+  mockLogin?: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -29,27 +37,81 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
+  // Simulate a mock Firebase user object
+  const mockUser = {
+    uid: "pXLGUgBJ2HV6FMm6Fw9yYNjTyc52",
+    email: "mockuser@example.com",
+    displayName: "Mock User",
+  } as unknown as User;
+
+  const mockProfile: UserProfile = {
+    uid: "pXLGUgBJ2HV6FMm6Fw9yYNjTyc52",
+    name: "Mock User",
+    email: "toren@toren.uk",
+    createdAt: {
+      seconds: Math.floor(Date.now() / 1000),
+      nanoseconds: 0,
+    } as unknown as import("firebase/firestore").Timestamp,
+    photoUrl: "", // or a mock URL
+    isAnonymous: false,
+    trackedReports: [],
+    createdReports: [],
+    lastActive: {
+      seconds: Math.floor(Date.now() / 1000),
+      nanoseconds: 0,
+    } as unknown as import("firebase/firestore").Timestamp,
+  };
+
+  const mockLogin = () => {
+    setUser(mockUser);
+    setUserProfile(mockProfile);
+    setIsLoggedIn(true);
+    setLoading(false);
+  };
+
+  const mockLogout = () => {
+    setUser(null);
+    setUserProfile(null);
+    setIsLoggedIn(false);
+  };
+
   useEffect(() => {
+    // Toggle this flag to simulate Firebase auth
+    const USE_MOCK_USER = true;
+
+    if (USE_MOCK_USER) {
+      setUser(mockUser);
+      setUserProfile(mockProfile);
+      setIsLoggedIn(true);
+      setLoading(false);
+
+      // Important: return a no-op cleanup to prevent memory leaks
+      return () => {};
+    }
+
+    // Normal Firebase auth handling
     const unsubscribe = subscribeToAuthState(async (firebaseUser) => {
       setUser(firebaseUser);
-      
+
       if (firebaseUser) {
         try {
           const profile = await getUserProfile(firebaseUser.uid);
           setUserProfile(profile);
         } catch (error) {
-          console.error('Error fetching user profile:', error);
+          console.error("Error fetching user profile:", error);
           setUserProfile(null);
         }
       } else {
         setUserProfile(null);
       }
-      
+
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
+
+
 
   return (
     <AuthContext.Provider
@@ -57,9 +119,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user,
         userProfile,
         loading,
-        isAuthenticated: user !== null,
+        isAuthenticated: !!user,
         isLoggedIn,
-      setIsLoggedIn,
+        setIsLoggedIn,
+                mockLogin,
+        mockLogout
       }}
     >
       {children}
@@ -70,7 +134,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };

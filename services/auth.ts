@@ -199,6 +199,13 @@ export const changePassword = async (currentPassword: string, newPassword: strin
 // AUTH STATE
 
 export const subscribeToAuthState = (callback: (user: User | null) => void) => {
+  if (!auth) {
+    callback({
+      uid: "mock-user-123",
+      email: "mockuser@example.com",
+    } as User);
+    return () => {};
+  }
   return onAuthStateChanged(auth, async (user) => {
     if (user) await createUserDocument(user);
     callback(user);

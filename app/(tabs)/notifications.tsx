@@ -4,7 +4,7 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from "react-native";
 
 export default function NotificationsScreen() {
@@ -31,6 +31,7 @@ export default function NotificationsScreen() {
         </View>
         <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
       </TouchableOpacity>
+
     </ScrollView>
   );
 }
@@ -42,6 +43,20 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+  },
+    backButton: {
+    position: 'absolute',
+    bottom: 50, // adjust for status bar / safe area
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   mapPlaceholder: {
     flex: 1,
