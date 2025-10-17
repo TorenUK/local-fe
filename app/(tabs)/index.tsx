@@ -1,6 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,22 +10,27 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import MapView, { Circle, Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
-import { useAuth } from '../../hooks/useAuth';
-import { useReports } from '../../hooks/useReport';
-import { getCurrentPosition } from '../../services/locationService';
+} from "react-native";
+import MapView, {
+  Circle,
+  Marker,
+  PROVIDER_GOOGLE,
+  Region,
+} from "react-native-maps";
+import { useAuth } from "../../hooks/useAuth";
+import { useReports } from "../../hooks/useReport";
+import { getCurrentPosition } from "../../services/locationService";
 
 interface Report {
   id: string;
-  type: 'crime' | 'lost_item' | 'missing_pet' | 'hazard';
+  type: "crime" | "lost_item" | "missing_pet" | "hazard";
   description: string;
   location: {
     latitude: number;
     longitude: number;
   };
   createdAt: Date;
-  status: 'open' | 'resolved';
+  status: "open" | "resolved";
   userId: string | null;
   upvotes: number;
 }
@@ -34,7 +39,7 @@ export default function MapScreen() {
   const mapRef = useRef<MapView>(null);
   const { user, userProfile } = useAuth();
   const router = useRouter();
-  
+
   const [region, setRegion] = useState<Region | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
@@ -45,10 +50,9 @@ export default function MapScreen() {
     missing_pet: true,
     hazard: true,
   });
-  
+
   // This will be replaced with real Firestore data
   const { reports, loading: reportsLoading } = useReports(region);
-
 
   useEffect(() => {
     const fetchLocation = async () => {
@@ -61,7 +65,7 @@ export default function MapScreen() {
           longitudeDelta: 0.02,
         });
       } catch (error: any) {
-        Alert.alert('Location Error', error.message);
+        Alert.alert("Location Error", error.message);
       } finally {
         setLoading(false);
       }
@@ -73,19 +77,19 @@ export default function MapScreen() {
   const handleAddAlert = () => {
     if (user?.isAnonymous) {
       Alert.alert(
-        'Create Account',
-        'Please create an account to submit reports.',
+        "Create Account",
+        "Please create an account to submit reports.",
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: "Cancel", style: "cancel" },
           {
-            text: 'Create Account',
-            onPress: () => router.push('/(auth)/signUp'),
+            text: "Create Account",
+            onPress: () => router.push("/(auth)/signUp"),
           },
         ]
       );
       return;
     }
-    router.push('/(tabs)/create');
+    router.push("/(tabs)/create");
   };
 
   const handleCenterLocation = async () => {
@@ -100,37 +104,37 @@ export default function MapScreen() {
       setRegion(newRegion);
       mapRef.current?.animateToRegion(newRegion, 500);
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      Alert.alert("Error", error.message);
     }
   };
 
-  const getMarkerColor = (type: Report['type']) => {
+  const getMarkerColor = (type: Report["type"]) => {
     switch (type) {
-      case 'crime':
-        return '#FF3B30';
-      case 'lost_item':
-        return '#FF9500';
-      case 'missing_pet':
-        return '#34C759';
-      case 'hazard':
-        return '#FFCC00';
+      case "crime":
+        return "#FF3B30";
+      case "lost_item":
+        return "#FF9500";
+      case "missing_pet":
+        return "#34C759";
+      case "hazard":
+        return "#FFCC00";
       default:
-        return '#007AFF';
+        return "#007AFF";
     }
   };
 
-  const getMarkerIcon = (type: Report['type']) => {
+  const getMarkerIcon = (type: Report["type"]) => {
     switch (type) {
-      case 'crime':
-        return 'warning';
-      case 'lost_item':
-        return 'help-circle';
-      case 'missing_pet':
-        return 'paw';
-      case 'hazard':
-        return 'alert-circle';
+      case "crime":
+        return "warning";
+      case "lost_item":
+        return "help-circle";
+      case "missing_pet":
+        return "paw";
+      case "hazard":
+        return "alert-circle";
       default:
-        return 'location';
+        return "location";
     }
   };
 
@@ -152,7 +156,8 @@ export default function MapScreen() {
         <Text style={styles.headerTitle}>Nearby Alerts</Text>
         <View style={styles.headerRight}>
           <Text style={styles.reportCount}>
-            {filteredReports.length} {filteredReports.length === 1 ? 'alert' : 'alerts'}
+            {filteredReports.length}{" "}
+            {filteredReports.length === 1 ? "alert" : "alerts"}
           </Text>
         </View>
       </View>
@@ -186,7 +191,7 @@ export default function MapScreen() {
         />
 
         {/* Report Markers */}
-        
+
         {filteredReports.map((report) => (
           <Marker
             key={report.id}
@@ -219,10 +224,7 @@ export default function MapScreen() {
 
       {/* Floating Action Buttons */}
       <View style={styles.fabContainer}>
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={handleCenterLocation}
-        >
+        <TouchableOpacity style={styles.fab} onPress={handleCenterLocation}>
           <Ionicons name="locate" size={24} color="#007AFF" />
         </TouchableOpacity>
 
@@ -280,33 +282,33 @@ interface ReportDetailModalProps {
 function ReportDetailModal({ report, onClose }: ReportDetailModalProps) {
   const router = useRouter();
 
-  const getTypeLabel = (type: Report['type']) => {
+  const getTypeLabel = (type: Report["type"]) => {
     switch (type) {
-      case 'crime':
-        return 'Crime Report';
-      case 'lost_item':
-        return 'Lost Item';
-      case 'missing_pet':
-        return 'Missing Pet';
-      case 'hazard':
-        return 'Hazard';
+      case "crime":
+        return "Crime Report";
+      case "lost_item":
+        return "Lost Item";
+      case "missing_pet":
+        return "Missing Pet";
+      case "hazard":
+        return "Hazard";
       default:
-        return 'Report';
+        return "Report";
     }
   };
 
-  const getTypeColor = (type: Report['type']) => {
+  const getTypeColor = (type: Report["type"]) => {
     switch (type) {
-      case 'crime':
-        return '#FF3B30';
-      case 'lost_item':
-        return '#FF9500';
-      case 'missing_pet':
-        return '#34C759';
-      case 'hazard':
-        return '#FFCC00';
+      case "crime":
+        return "#FF3B30";
+      case "lost_item":
+        return "#FF9500";
+      case "missing_pet":
+        return "#34C759";
+      case "hazard":
+        return "#FFCC00";
       default:
-        return '#007AFF';
+        return "#007AFF";
     }
   };
 
@@ -350,12 +352,12 @@ function ReportDetailModal({ report, onClose }: ReportDetailModalProps) {
                     styles.statusDot,
                     {
                       backgroundColor:
-                        report.status === 'open' ? '#34C759' : '#8E8E93',
+                        report.status === "open" ? "#34C759" : "#8E8E93",
                     },
                   ]}
                 />
                 <Text style={styles.statusText}>
-                  {report.status === 'open' ? 'Active' : 'Resolved'}
+                  {report.status === "open" ? "Active" : "Resolved"}
                 </Text>
               </View>
             </View>
@@ -392,7 +394,11 @@ function ReportDetailModal({ report, onClose }: ReportDetailModalProps) {
             onPress={() => {
               onClose();
               // Navigate to full report details
-              // router.push(`/report/${report.id}`);
+
+              router.push({
+                pathname: "/report/[id]",
+                params: { id: report.id },
+              });
             }}
           >
             <Text style={styles.viewDetailsButtonText}>View Full Details</Text>
@@ -406,21 +412,41 @@ function ReportDetailModal({ report, onClose }: ReportDetailModalProps) {
 
 interface FilterModalProps {
   visible: boolean;
-  filters: { crime: boolean; lost_item: boolean; missing_pet: boolean; hazard: boolean };
+  filters: {
+    crime: boolean;
+    lost_item: boolean;
+    missing_pet: boolean;
+    hazard: boolean;
+  };
   onClose: () => void;
-  onApply: (filters: { crime: boolean; lost_item: boolean; missing_pet: boolean; hazard: boolean }) => void;
+  onApply: (filters: {
+    crime: boolean;
+    lost_item: boolean;
+    missing_pet: boolean;
+    hazard: boolean;
+  }) => void;
 }
 
-type FilterKey = 'crime' | 'lost_item' | 'missing_pet' | 'hazard';
+type FilterKey = "crime" | "lost_item" | "missing_pet" | "hazard";
 
 function FilterModal({ visible, filters, onClose, onApply }: FilterModalProps) {
   const [localFilters, setLocalFilters] = useState(filters);
 
   const filterOptions = [
-    { key: 'crime', label: 'Crime Reports', icon: 'warning', color: '#FF3B30' },
-    { key: 'lost_item', label: 'Lost Items', icon: 'help-circle', color: '#FF9500' },
-    { key: 'missing_pet', label: 'Missing Pets', icon: 'paw', color: '#34C759' },
-    { key: 'hazard', label: 'Hazards', icon: 'alert-circle', color: '#FFCC00' },
+    { key: "crime", label: "Crime Reports", icon: "warning", color: "#FF3B30" },
+    {
+      key: "lost_item",
+      label: "Lost Items",
+      icon: "help-circle",
+      color: "#FF9500",
+    },
+    {
+      key: "missing_pet",
+      label: "Missing Pets",
+      icon: "paw",
+      color: "#34C759",
+    },
+    { key: "hazard", label: "Hazards", icon: "alert-circle", color: "#FFCC00" },
   ];
 
   const handleToggle = (key: FilterKey) => {
@@ -435,7 +461,12 @@ function FilterModal({ visible, filters, onClose, onApply }: FilterModalProps) {
   const handleReset = () => {
     const resetFilters = Object.keys(localFilters).reduce(
       (acc, key) => ({ ...acc, [key]: true }),
-      {} as { crime: boolean; lost_item: boolean; missing_pet: boolean; hazard: boolean }
+      {} as {
+        crime: boolean;
+        lost_item: boolean;
+        missing_pet: boolean;
+        hazard: boolean;
+      }
     );
     setLocalFilters(resetFilters);
   };
@@ -473,14 +504,19 @@ function FilterModal({ visible, filters, onClose, onApply }: FilterModalProps) {
                       { backgroundColor: option.color },
                     ]}
                   >
-                    <Ionicons name={option.icon as any} size={20} color="#fff" />
+                    <Ionicons
+                      name={option.icon as any}
+                      size={20}
+                      color="#fff"
+                    />
                   </View>
                   <Text style={styles.filterLabel}>{option.label}</Text>
                 </View>
                 <View
                   style={[
                     styles.checkbox,
-                    localFilters[option.key as FilterKey] && styles.checkboxChecked,
+                    localFilters[option.key as FilterKey] &&
+                      styles.checkboxChecked,
                   ]}
                 >
                   {localFilters[option.key as FilterKey] && (
@@ -524,29 +560,29 @@ const styles = StyleSheet.create({
   },
   loader: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f5f5f5',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f5f5f5",
   },
   loaderText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#666',
+    color: "#666",
   },
   header: {
-    position: 'absolute',
+    position: "absolute",
     top: 60,
     left: 16,
     right: 16,
     zIndex: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#000',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -554,40 +590,40 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#000',
+    fontWeight: "700",
+    color: "#000",
   },
   headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   reportCount: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#007AFF',
+    fontWeight: "600",
+    color: "#007AFF",
   },
   anonymousBanner: {
-    position: 'absolute',
+    position: "absolute",
     top: 130,
     left: 16,
     right: 16,
     zIndex: 10,
-    backgroundColor: 'rgba(255, 149, 0, 0.95)',
+    backgroundColor: "rgba(255, 149, 0, 0.95)",
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   anonymousBannerText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#fff',
+    fontWeight: "600",
+    color: "#fff",
     flex: 1,
   },
   fabContainer: {
-    position: 'absolute',
+    position: "absolute",
     right: 16,
     bottom: 100,
     zIndex: 10,
@@ -596,40 +632,40 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
   },
   filterBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: 8,
     right: 8,
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#FF3B30',
+    backgroundColor: "#FF3B30",
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: "#fff",
   },
   addButton: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 24,
     right: 16,
     left: 16,
     zIndex: 10,
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     paddingVertical: 16,
     borderRadius: 12,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     gap: 8,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
@@ -637,60 +673,60 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
+    fontWeight: "600",
+    color: "#fff",
   },
   markerContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 3,
-    borderColor: '#fff',
-    shadowColor: '#000',
+    borderColor: "#fff",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
   },
   watermarkContainer: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 90,
     left: 0,
     right: 0,
-    alignItems: 'center',
+    alignItems: "center",
     zIndex: 1,
   },
   watermarkText: {
     fontSize: 11,
-    color: 'rgba(0, 0, 0, 0.2)',
-    fontWeight: '500',
+    color: "rgba(0, 0, 0, 0.2)",
+    fontWeight: "500",
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingBottom: 40,
-    maxHeight: '80%',
+    maxHeight: "80%",
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 24,
     paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F7',
+    borderBottomColor: "#F2F2F7",
   },
   modalHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     flex: 1,
   },
@@ -698,13 +734,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000',
+    fontWeight: "bold",
+    color: "#000",
     flex: 1,
   },
   modalBody: {
@@ -716,20 +752,20 @@ const styles = StyleSheet.create({
   },
   modalLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#8E8E93',
-    textTransform: 'uppercase',
+    fontWeight: "600",
+    color: "#8E8E93",
+    textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 8,
   },
   modalText: {
     fontSize: 16,
-    color: '#000',
+    color: "#000",
     lineHeight: 22,
   },
   statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   statusDot: {
@@ -739,68 +775,68 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
+    fontWeight: "600",
+    color: "#000",
   },
   modalActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginTop: 20,
   },
   actionButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 6,
     paddingVertical: 12,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: "#F2F2F7",
     borderRadius: 10,
   },
   actionButtonText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#007AFF',
+    fontWeight: "600",
+    color: "#007AFF",
   },
   viewDetailsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     marginHorizontal: 24,
     marginTop: 16,
     paddingVertical: 16,
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     borderRadius: 12,
   },
   viewDetailsButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
+    fontWeight: "600",
+    color: "#fff",
   },
   filterModalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingBottom: 40,
-    maxHeight: '70%',
+    maxHeight: "70%",
   },
   filterSubtitle: {
     fontSize: 14,
-    color: '#8E8E93',
+    color: "#8E8E93",
     marginBottom: 20,
   },
   filterOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F7',
+    borderBottomColor: "#F2F2F7",
   },
   filterOptionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     flex: 1,
   },
@@ -808,29 +844,29 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   filterLabel: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#000',
+    fontWeight: "500",
+    color: "#000",
   },
   checkbox: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#C7C7CC',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: "#C7C7CC",
+    justifyContent: "center",
+    alignItems: "center",
   },
   checkboxChecked: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: "#007AFF",
+    borderColor: "#007AFF",
   },
   filterActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginHorizontal: 24,
     marginTop: 20,
@@ -839,22 +875,22 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 16,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
   resetButton: {
-    backgroundColor: '#F2F2F7',
+    backgroundColor: "#F2F2F7",
   },
   resetButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
+    fontWeight: "600",
+    color: "#000",
   },
   applyButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
   },
   applyButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
+    fontWeight: "600",
+    color: "#fff",
   },
 });
