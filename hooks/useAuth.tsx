@@ -76,8 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    // Toggle this flag to simulate Firebase auth
-    const USE_MOCK_USER = true;
+    const USE_MOCK_USER = false;
 
     if (USE_MOCK_USER) {
       setUser(mockUser);
@@ -85,11 +84,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoggedIn(true);
       setLoading(false);
 
-      // Important: return a no-op cleanup to prevent memory leaks
+     //prevent memory leaks
       return () => {};
     }
 
-    // Normal Firebase auth handling
+    
     const unsubscribe = subscribeToAuthState(async (firebaseUser) => {
       setUser(firebaseUser);
 
@@ -122,7 +121,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isAuthenticated: !!user,
         isLoggedIn,
         setIsLoggedIn,
-                mockLogin,
+        mockLogin,
         mockLogout
       }}
     >
