@@ -1,3 +1,4 @@
+import { signInAnonymous, signInWithEmail } from '@/services/auth';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -176,7 +177,7 @@ export default function SignInScreen() {
   const onSubmit = async (data: SignInForm) => {
     try {
       setLoading(true);
-      // await signInWithEmail(data.email, data.password);
+      await signInWithEmail(data.email, data.password);
       router.replace('/(tabs)');
     } catch (error: any) {
       Alert.alert('Error', error.message);
@@ -188,7 +189,7 @@ export default function SignInScreen() {
   const handleAnonymousSignIn = async () => {
     try {
       setLoading(true);
-      // await signInAnonymous();
+      await signInAnonymous();
       router.replace('/(tabs)');
     } catch (error: any) {
       Alert.alert('Error', error.message);
