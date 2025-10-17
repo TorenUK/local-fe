@@ -3,6 +3,8 @@ import { Tabs } from "expo-router";
 import { Platform, StyleSheet } from "react-native";
 
 export default function TabsLayout() {
+
+
   return (
     <Tabs
       screenOptions={{
@@ -75,7 +77,7 @@ export default function TabsLayout() {
             />
           ),
           headerTitle: "Notifications",
-          tabBarBadge: 3, 
+          // tabBarBadge: 1, 
         }}
       />
       <Tabs.Screen

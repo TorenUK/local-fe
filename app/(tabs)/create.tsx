@@ -21,7 +21,7 @@ import {
 } from "react-native";
 import { useAuth } from "../../hooks/useAuth";
 import { createReport, ReportType } from "../../services/reportService";
-// import { uploadReportPhotos } from "../../services/storageService";
+import { uploadReportPhotos } from "../../services/storageService";
 
 const REPORT_TYPES = [
   { id: "crime" as ReportType, label: "Crime", icon: "warning", color: "#FF3B30", description: "Report suspicious activity or crime" },
@@ -114,7 +114,7 @@ export default function CreateReportScreen() {
     try {
       setLoading(true);
       let photoUrls: string[] = [];
-    //   if (photos.length) photoUrls = await uploadReportPhotos(photos);
+      if (photos.length) photoUrls = await uploadReportPhotos(photos);
 
     console.log(data, "-----form data-----")
 
