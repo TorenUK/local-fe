@@ -281,7 +281,7 @@ const filteredReports = region
       {/* Add Alert Button */}
       <TouchableOpacity style={styles.addButton} onPress={handleAddAlert}>
         <Ionicons name="add" size={24} color="#fff" />
-        <Text style={styles.addButtonText}>Add Alert</Text>
+        <Text style={styles.addButtonText}>Create Alert</Text>
       </TouchableOpacity>
 
       {/* Report Detail Modal */}

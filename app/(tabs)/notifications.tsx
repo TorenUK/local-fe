@@ -23,11 +23,8 @@ import {
 import { db } from '../../firebase/config';
 import { useAuth } from '../../hooks/useAuth';
 import {
-  callEmergency,
   createTestNotifications,
   deleteAllNotifications,
-  EmergencyContact,
-  getEmergencyNumbers,
   markAllAsRead,
   registerForPushNotifications,
   savePushToken,
@@ -49,7 +46,7 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [emergencyNumbers] = useState<EmergencyContact[]>(getEmergencyNumbers());
+  
 
   useEffect(() => {
     if (!user) {
@@ -141,10 +138,6 @@ export default function NotificationsScreen() {
   const handleCreateTestNotifications = async () => {
     if (!user) return;
     await createTestNotifications(user.uid);
-  };
-
-  const handleEmergencyCall = (contact: EmergencyContact) => {
-    callEmergency(contact.number);
   };
 
   const handleNotificationPress = (notification: NotificationItem) => {

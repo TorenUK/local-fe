@@ -20,6 +20,7 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "../../hooks/useAuth";
+import { callEmergency, EmergencyContact, getEmergencyNumbers, } from '../../services/emergencyService';
 import { createReport, ReportType } from "../../services/reportService";
 import { uploadReportPhotos } from "../../services/storageService";
 
@@ -50,10 +51,16 @@ export default function CreateReportScreen() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [emergencyNumbers] = useState<EmergencyContact[]>(getEmergencyNumbers());
 
   const { control, handleSubmit, formState: { errors }, setValue, watch } = useForm<FormData>({
     defaultValues: { type: "crime", description: "", isAnonymous: false },
   });
+
+    const handleEmergencyCall = (contact: EmergencyContact) => {
+    callEmergency(contact.number);
+  };
+
 
   const isAnonymous = watch("isAnonymous");
 
@@ -164,6 +171,42 @@ export default function CreateReportScreen() {
             </TouchableOpacity>
           ))}
         </View>
+                <View style={styles.container}>
+        {/* <Text style={styles.title}>Emergency Services</Text> */}
+        <Text style={styles.emergencySectionSubtitle}>
+          Quick access to emergency contacts
+        </Text>
+
+        {emergencyNumbers.map((contact, index) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.emergencyCard}
+            onPress={() => handleEmergencyCall(contact)}
+          >
+            <View
+              style={[
+                styles.emergencyIcon,
+                index === 0 && styles.emergencyIconPrimary,
+              ]}
+            >
+              <Ionicons
+                name={index === 0 ? 'call' : 'call-outline'}
+                size={24}
+                color={index === 0 ? '#fff' : '#FF3B30'}
+              />
+            </View>
+            <View style={styles.emergencyContent}>
+              <Text style={styles.emergencyName}>{contact.name}</Text>
+              <Text style={styles.emergencyDescription}>
+                {contact.description}
+              </Text>
+            </View>
+            <View style={styles.emergencyNumber}>
+              <Text style={styles.emergencyNumberText}>{contact.number}</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
       </ScrollView>
     );
   }
@@ -285,6 +328,7 @@ export default function CreateReportScreen() {
             <Text style={styles.submitButtonText}>Submit Report</Text>
           )}
         </TouchableOpacity>
+
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -327,4 +371,68 @@ const styles = StyleSheet.create({
   switchSublabel: { fontSize: 12, color: "#666" },
   submitButton: { backgroundColor: "#007AFF", borderRadius: 12, padding: 16, alignItems: "center", marginTop: 24 },
   submitButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+   emergencySection: {
+    backgroundColor: '#fff',
+    padding: 20,
+    marginBottom: 12,
+  },
+  emergencySectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000',
+    marginBottom: 4,
+  },
+  emergencySectionSubtitle: {
+    fontSize: 20,
+    color: '#000',
+    fontWeight: 'bold',
+    marginTop: 24,
+    marginBottom: 16
+  },
+  emergencyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9F9F9',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+  },
+  emergencyIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFEBEE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  emergencyIconPrimary: {
+    backgroundColor: '#FF3B30',
+  },
+  emergencyContent: {
+    flex: 1,
+  },
+  emergencyName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 2,
+  },
+  emergencyDescription: {
+    fontSize: 12,
+    color: '#666',
+  },
+  emergencyNumber: {
+    backgroundColor: '#E8F4FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  emergencyNumberText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#007AFF',
+  },
 });

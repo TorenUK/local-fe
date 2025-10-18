@@ -27,9 +27,6 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// ============================================
-// TYPES
-// ============================================
 
 export interface NotificationData {
   type: 'new_report' | 'comment' | 'upvote' | 'status_change' | 'nearby_alert';
@@ -39,15 +36,6 @@ export interface NotificationData {
   data?: Record<string, any>;
 }
 
-export interface EmergencyContact {
-  name: string;
-  number: string;
-  description: string;
-}
-
-// ============================================
-// PUSH NOTIFICATION SETUP
-// ============================================
 
 export const registerForPushNotifications = async (): Promise<string | null> => {
   try {
@@ -148,10 +136,6 @@ export const clearAllNotifications = async (): Promise<void> => {
     console.error('Error clearing notifications:', error);
   }
 };
-
-// ============================================
-// NOTIFICATION MANAGEMENT IN FIRESTORE
-// ============================================
 
 /**
  * Create a notification document in Firestore
@@ -298,57 +282,6 @@ export const createTestNotifications = async (userId: string): Promise<void> => 
   }
 };
 
-// ============================================
-// EMERGENCY SERVICES
-// ============================================
-
-export const getEmergencyNumbers = (): EmergencyContact[] => {
-  // UK emergency numbers - customize based on user location
-  return [
-    {
-      name: 'Emergency Services',
-      number: '999',
-      description: 'Police, Fire, Ambulance',
-    },
-    {
-      name: 'Police Non-Emergency',
-      number: '101',
-      description: 'Report non-urgent crime',
-    },
-    {
-      name: 'NHS 111',
-      number: '111',
-      description: 'Medical advice and support',
-    },
-  ];
-};
-
-export const callEmergency = async (number: string): Promise<void> => {
-  try {
-    const url = `tel:${number}`;
-    const canOpen = await Linking.canOpenURL(url);
-    
-    if (canOpen) {
-      Alert.alert(
-        'Call Emergency Services',
-        `Are you sure you want to call ${number}?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Call',
-            style: 'destructive',
-            onPress: () => Linking.openURL(url),
-          },
-        ]
-      );
-    } else {
-      Alert.alert('Error', 'Cannot make phone calls on this device');
-    }
-  } catch (error) {
-    console.error('Error making emergency call:', error);
-    Alert.alert('Error', 'Failed to initiate call');
-  }
-};
 
 export const navigateToLocation = async (
   latitude: number,
