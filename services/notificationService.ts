@@ -1,7 +1,18 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from "expo-notifications";
-import { arrayUnion, doc, updateDoc } from 'firebase/firestore';
+import * as Notifications from 'expo-notifications';
+import {
+  addDoc,
+  arrayUnion,
+  collection,
+  doc,
+  getDocs,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+  writeBatch
+} from 'firebase/firestore';
 import { Alert, Linking, Platform } from 'react-native';
 import { db } from '../firebase/config';
 
@@ -12,102 +23,104 @@ Notifications.setNotificationHandler({
     shouldPlaySound: true,
     shouldSetBadge: true,
     shouldShowBanner: true,
-    shouldShowList: true,
+    shouldShowList: true
   }),
 });
+
+// ============================================
+// TYPES
+// ============================================
+
+export interface NotificationData {
+  type: 'new_report' | 'comment' | 'upvote' | 'status_change' | 'nearby_alert';
+  reportId?: string;
+  title: string;
+  body: string;
+  data?: Record<string, any>;
+}
+
+export interface EmergencyContact {
+  name: string;
+  number: string;
+  description: string;
+}
 
 // ============================================
 // PUSH NOTIFICATION SETUP
 // ============================================
 
-// export interface NotificationData {
-//   type: 'new_report' | 'comment' | 'upvote' | 'status_change' | 'nearby_alert';
-//   reportId?: string;
-//   title: string;
-//   body: string;
-//   data?: Record<string, any>;
-// }
-
-/**
- * Register device for push notifications
- */
 export const registerForPushNotifications = async (): Promise<string | null> => {
   try {
     if (!Device.isDevice) {
-      Alert.alert('Error', 'Push notifications only work on physical devices');
+      console.log('Push notifications only work on physical devices');
       return null;
     }
 
-    // Check existing permissions
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
 
-    // Request permissions if not granted
     if (existingStatus !== 'granted') {
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }
 
     if (finalStatus !== 'granted') {
-      Alert.alert('Error', 'Failed to get push notification permissions');
+      console.log('Failed to get push notification permissions');
       return null;
     }
 
-    // Get push token
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-    
-    if (!projectId) {
-      console.warn('No project ID found');
+    // For Expo Go, this will work. For standalone, need project ID
+    try {
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId || 
+                       Constants.easConfig?.projectId;
+      
+      const tokenData = projectId 
+        ? await Notifications.getExpoPushTokenAsync({ projectId })
+        : await Notifications.getExpoPushTokenAsync();
+        
+      console.log('Push token:', tokenData.data);
+
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'Default',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+        });
+
+        await Notifications.setNotificationChannelAsync('emergency', {
+          name: 'Emergency Alerts',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 500, 500, 500],
+          lightColor: '#FF0000',
+          sound: 'default',
+        });
+      }
+
+      return tokenData.data;
+    } catch (tokenError) {
+      console.log('Error getting push token:', tokenError);
       return null;
     }
-
-    const token = await Notifications.getExpoPushTokenAsync({ projectId });
-    console.log('Push token:', token.data);
-
-    // Configure notification channels for Android
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'Default',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
-
-      await Notifications.setNotificationChannelAsync('emergency', {
-        name: 'Emergency Alerts',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 500, 500, 500],
-        lightColor: '#FF0000',
-        sound: 'default',
-      });
-    }
-
-    return token.data;
   } catch (error) {
     console.error('Error registering for push notifications:', error);
     return null;
   }
 };
 
-/**
- * Save push token to user's Firestore document
- */
 export const savePushToken = async (userId: string, token: string): Promise<void> => {
   try {
     const userRef = doc(db, 'users', userId);
     await updateDoc(userRef, {
       pushTokens: arrayUnion(token),
+      lastTokenUpdate: serverTimestamp(),
     });
     console.log('Push token saved to Firestore');
   } catch (error) {
     console.error('Error saving push token:', error);
-    throw error;
   }
 };
 
-/**
- * Send local notification (for testing or immediate alerts)
- */
 export const sendLocalNotification = async (
   data: NotificationData
 ): Promise<void> => {
@@ -120,93 +133,168 @@ export const sendLocalNotification = async (
         sound: true,
         priority: Notifications.AndroidNotificationPriority.HIGH,
       },
-      trigger: null, // Send immediately
+      trigger: null,
     });
   } catch (error) {
     console.error('Error sending local notification:', error);
   }
 };
 
-/**
- * Schedule notification for later
- */
-
-
-type NotificationData = {
-  title: string;
-  body: string;
-  data?: Record<string, any>;
-};
-
-export const scheduleNotification = async (
-  data: NotificationData,
-  triggerDate: Date
-): Promise<string> => {
-  try {
-    const notificationId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: data.title,
-        body: data.body,
-        data: data.data || {},
-        sound: true,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE, // ✅ required now
-        date: triggerDate,
-      },
-    });
-
-    return notificationId;
-  } catch (error) {
-    console.error("Error scheduling notification:", error);
-    throw error;
-  }
-};
-
-/**
- * Cancel scheduled notification
- */
-export const cancelNotification = async (
-  notificationId: string
-): Promise<void> => {
-  try {
-    await Notifications.cancelScheduledNotificationAsync(notificationId);
-  } catch (error) {
-    console.error('Error canceling notification:', error);
-  }
-};
-
-/**
- * Get all scheduled notifications
- */
-export const getScheduledNotifications = async () => {
-  try {
-    return await Notifications.getAllScheduledNotificationsAsync();
-  } catch (error) {
-    console.error('Error getting scheduled notifications:', error);
-    return [];
-  }
-};
-
-/**
- * Clear all notifications
- */
 export const clearAllNotifications = async (): Promise<void> => {
   try {
     await Notifications.dismissAllNotificationsAsync();
+    await Notifications.setBadgeCountAsync(0);
   } catch (error) {
     console.error('Error clearing notifications:', error);
   }
 };
 
+// ============================================
+// NOTIFICATION MANAGEMENT IN FIRESTORE
+// ============================================
+
 /**
- * Set notification badge count
+ * Create a notification document in Firestore
  */
-export const setBadgeCount = async (count: number): Promise<void> => {
+export const createNotification = async (
+  userId: string,
+  type: NotificationData['type'],
+  title: string,
+  message: string,
+  reportId?: string
+): Promise<void> => {
   try {
-    await Notifications.setBadgeCountAsync(count);
+    await addDoc(collection(db, 'notifications'), {
+      userId,
+      type,
+      title,
+      message,
+      reportId: reportId || null,
+      read: false,
+      createdAt: serverTimestamp(),
+    });
+    console.log('Notification created in Firestore');
   } catch (error) {
-    console.error('Error setting badge count:', error);
+    console.error('Error creating notification:', error);
+    throw error;
+  }
+};
+
+/**
+ * Mark notification as read
+ */
+export const markNotificationAsRead = async (notificationId: string): Promise<void> => {
+  try {
+    const notificationRef = doc(db, 'notifications', notificationId);
+    await updateDoc(notificationRef, {
+      read: true,
+    });
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+  }
+};
+
+/**
+ * Mark all notifications as read for a user
+ */
+export const markAllAsRead = async (userId: string): Promise<void> => {
+  try {
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId),
+      where('read', '==', false)
+    );
+    
+    const snapshot = await getDocs(q);
+    const batch = writeBatch(db);
+    
+    snapshot.forEach((doc) => {
+      batch.update(doc.ref, { read: true });
+    });
+    
+    await batch.commit();
+    console.log('All notifications marked as read');
+  } catch (error) {
+    console.error('Error marking all as read:', error);
+  }
+};
+
+/**
+ * Delete all notifications for a user
+ */
+export const deleteAllNotifications = async (userId: string): Promise<void> => {
+  try {
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId)
+    );
+    
+    const snapshot = await getDocs(q);
+    const batch = writeBatch(db);
+    
+    snapshot.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+    
+    await batch.commit();
+    console.log('All notifications deleted');
+  } catch (error) {
+    console.error('Error deleting notifications:', error);
+  }
+};
+
+/**
+ * Create test notifications (for development)
+ */
+export const createTestNotifications = async (userId: string): Promise<void> => {
+  try {
+    const testNotifications = [
+      {
+        type: 'nearby_alert' as const,
+        title: '🚨 Crime Report Nearby',
+        message: 'Suspicious activity reported 0.8km from your location',
+        reportId: 'test-report-1',
+      },
+      {
+        type: 'comment' as const,
+        title: '💬 New Comment',
+        message: 'Someone commented on your Lost Item report',
+        reportId: 'test-report-2',
+      },
+      {
+        type: 'upvote' as const,
+        title: '👍 Report Upvoted',
+        message: 'Your report received 5 upvotes',
+        reportId: 'test-report-3',
+      },
+      {
+        type: 'status_change' as const,
+        title: '✅ Report Resolved',
+        message: 'A report you are tracking has been marked as resolved',
+        reportId: 'test-report-4',
+      },
+      {
+        type: 'new_report' as const,
+        title: '🐕 Missing Pet Alert',
+        message: 'Lost dog reported near High Street - Golden Retriever',
+        reportId: 'test-report-5',
+      },
+    ];
+
+    for (const notif of testNotifications) {
+      await createNotification(
+        userId,
+        notif.type,
+        notif.title,
+        notif.message,
+        notif.reportId
+      );
+    }
+
+    Alert.alert('Success', 'Test notifications created!');
+  } catch (error) {
+    console.error('Error creating test notifications:', error);
+    Alert.alert('Error', 'Failed to create test notifications');
   }
 };
 
@@ -214,39 +302,27 @@ export const setBadgeCount = async (count: number): Promise<void> => {
 // EMERGENCY SERVICES
 // ============================================
 
-export interface EmergencyContact {
-  name: string;
-  number: string;
-  description: string;
-}
-
-/**
- * Get emergency numbers by country/region
- */
 export const getEmergencyNumbers = (): EmergencyContact[] => {
-  // You can make this dynamic based on user location
+  // UK emergency numbers - customize based on user location
   return [
     {
       name: 'Emergency Services',
-      number: '999', // UK
+      number: '999',
       description: 'Police, Fire, Ambulance',
     },
     {
-      name: 'Police',
-      number: '101', // UK Non-Emergency
-      description: 'Non-emergency police line',
+      name: 'Police Non-Emergency',
+      number: '101',
+      description: 'Report non-urgent crime',
     },
     {
       name: 'NHS 111',
-      number: '111', // UK
-      description: 'Medical advice',
+      number: '111',
+      description: 'Medical advice and support',
     },
   ];
 };
 
-/**
- * Call emergency services
- */
 export const callEmergency = async (number: string): Promise<void> => {
   try {
     const url = `tel:${number}`;
@@ -274,9 +350,6 @@ export const callEmergency = async (number: string): Promise<void> => {
   }
 };
 
-/**
- * Open navigation to location
- */
 export const navigateToLocation = async (
   latitude: number,
   longitude: number,
@@ -292,16 +365,11 @@ export const navigateToLocation = async (
     const appleMapsUrl = `http://maps.apple.com/?daddr=${destination}&dirflg=d`;
     const fallbackUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
 
-    // Try Google Maps first
     if (googleMapsUrl && await Linking.canOpenURL(googleMapsUrl)) {
       await Linking.openURL(googleMapsUrl);
-    }
-    // Try Apple Maps on iOS
-    else if (Platform.OS === 'ios' && await Linking.canOpenURL(appleMapsUrl)) {
+    } else if (Platform.OS === 'ios' && await Linking.canOpenURL(appleMapsUrl)) {
       await Linking.openURL(appleMapsUrl);
-    }
-    // Fallback to web browser
-    else {
+    } else {
       await Linking.openURL(fallbackUrl);
     }
   } catch (error) {
