@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -17,11 +19,19 @@ import {
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
 import {
-  signOut
+  deleteAccount as authDeleteAccount,
+  signOut as authSignOut,
+  changeEmail,
+  changePassword,
+  linkAnonymousWithEmail,
+  sendVerificationEmail,
+  updateUserDisplayProfile,
+  updateUserProfile,
 } from '../../services/auth';
+import { uploadProfilePhoto } from '../../services/storageService';
 
 export default function ProfileScreen() {
-  const { user, userProfile, isAuthenticated, isLoggedIn } = useAuth();
+  const { user, userProfile, isAuthenticated } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -31,7 +41,17 @@ export default function ProfileScreen() {
   const [showChangeEmail, setShowChangeEmail] = useState(false);
   const [showLinkAccount, setShowLinkAccount] = useState(false);
 
-  const handleSignOut = async () => {
+  // --- Helpers for Alert callbacks that must be synchronous in signature ---
+  const signOutHandler = async () => {
+    try {
+      await authSignOut();
+      router.replace('/(auth)/signIn');
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    }
+  };
+
+  const handleSignOut = () => {
     Alert.alert(
       'Sign Out',
       'Are you sure you want to sign out?',
@@ -40,97 +60,192 @@ export default function ProfileScreen() {
         {
           text: 'Sign Out',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await signOut();
-              router.replace('/(auth)/signIn');
-            } catch (error: any) {
-              Alert.alert('Error', error.message);
-            }
+          onPress: () => {
+            // call async helper, don't `await` here
+            void signOutHandler();
           },
         },
       ]
     );
   };
 
-//   const handleDeleteAccount = () => {
-//     Alert.alert(
-//       'Delete Account',
-//       'This action cannot be undone. All your data will be permanently deleted.',
-//       [
-//         { text: 'Cancel', style: 'cancel' },
-//         {
-//           text: 'Delete',
-//           style: 'destructive',
-//           onPress: async () => {
-//             try {
-//               setLoading(true);
-//               await deleteAccount();
-//               router.replace('/(auth)/signIn');
-//             } catch (error: any) {
-//               Alert.alert('Error', error.message);
-//             } finally {
-//               setLoading(false);
-//             }
-//           },
-//         },
-//       ]
-//     );
-//   };
+  const deleteAccountHandler = async () => {
+    try {
+      setLoading(true);
+      await authDeleteAccount(undefined);
+      router.replace('/(auth)/signIn');
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-//   const handleSendVerification = async () => {
-//     try {
-//       setLoading(true);
-//       await sendVerificationEmail();
-//       Alert.alert('Success', 'Verification email sent! Please check your inbox.');
-//     } catch (error: any) {
-//       Alert.alert('Error', error.message);
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This action cannot be undone. All your data will be permanently deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void deleteAccountHandler();
+          },
+        },
+      ]
+    );
+  };
 
-//   const toggleNotifications = async (value: boolean) => {
-//     try {
-//       if (!user) return;
-//       await updateUserProfile(user.uid, {
-//         settings: {
-//           ...userProfile?.settings,
-//           notificationsEnabled: value,
-//         },
-//       });
-//     } catch (error: any) {
-//       Alert.alert('Error', error.message);
-//     }
-//   };
+  const handleSendVerification = async () => {
+    try {
+      setLoading(true);
+      await sendVerificationEmail();
+      Alert.alert('Success', 'Verification email sent! Please check your inbox.');
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-//   const toggleEmailNotifications = async (value: boolean) => {
-//     try {
-//       if (!user) return;
-//       await updateUserProfile(user.uid, {
-//         settings: {
-//           ...userProfile?.settings,
-//           emailNotifications: value,
-//         },
-//       });
-//     } catch (error: any) {
-//       Alert.alert('Error', error.message);
-//     }
-//   };
+  const handleChangeProfilePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-  if (!isAuthenticated || !user ) {
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Camera roll permission is required.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
+
+
+      // Expo ImagePicker v14+ returns { canceled, assets }
+      if (!result.canceled && result.assets?.[0]?.uri && user) {
+        setLoading(true);
+        const photoUrl = await uploadProfilePhoto(result.assets[0].uri, user.uid);
+        await updateUserDisplayProfile({ photoUrl });
+        Alert.alert('Success', 'Profile photo updated!');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleNotifications = async (value: boolean) => {
+    try {
+      if (!user) return;
+      await updateUserProfile(user.uid, {
+        settings: {
+          ...userProfile?.settings,
+          notificationsEnabled: value,
+          emailNotifications: userProfile?.settings?.emailNotifications ?? true,
+          alertRadius: userProfile?.settings?.alertRadius ?? 5,
+        },
+      });
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    }
+  };
+
+  const toggleEmailNotifications = async (value: boolean) => {
+    try {
+      if (!user) return;
+      await updateUserProfile(user.uid, {
+        settings: {
+          ...userProfile?.settings,
+          emailNotifications: value,
+          alertRadius: userProfile?.settings?.alertRadius ?? 5,
+          notificationsEnabled: userProfile?.settings?.notificationsEnabled ?? true,
+        },
+      });
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    }
+  };
+
+  // --- Alert.prompt fix: use sync onPress that calls async helper ---
+  const handleSaveRadius = async (value?: string) => {
+    if (!user || !userProfile) return;
+    const radius = parseInt(value ?? String(userProfile?.settings?.alertRadius ?? 5), 10);
+    if (isNaN(radius) || radius < 1 || radius > 50) {
+      Alert.alert('Error', 'Please enter a number between 1 and 50');
+      return;
+    }
+    try {
+      await updateUserProfile(user.uid, {
+        settings: {
+          ...userProfile?.settings,
+          notificationsEnabled: userProfile?.settings?.notificationsEnabled ?? true,
+          emailNotifications: userProfile?.settings?.emailNotifications ?? true,
+          alertRadius: radius,
+        },
+      });
+      Alert.alert('Success', `Alert radius set to ${radius}km`);
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    }
+  };
+
+  const handleAlertRadiusChange = () => {
+    if (!user || !userProfile) return;
+
+    // Alert.prompt is iOS-only; TypeScript requires the onPress to be (value?: string) => void
+    // so we pass a synchronous function that calls an async helper.
+    if (Platform.OS === 'ios') {
+      Alert.prompt(
+        'Alert Radius',
+        'Enter your preferred alert radius in kilometers (1-50)',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Save',
+            onPress: (value?: string) => {
+              void handleSaveRadius(value);
+            },
+          },
+        ],
+        'plain-text',
+        String(userProfile?.settings?.alertRadius ?? 5)
+      );
+    } else {
+      // Android: Alert.prompt isn't available. Use a simple workaround: show a confirm alert that opens an in-app modal
+      // For now we fall back to a simple two-step prompt: inform users they must change this in settings screen (or implement custom modal)
+      // You can replace this with a custom modal implementation to accept input on Android.
+      Alert.alert(
+        'Change Alert Radius',
+        'Changing alert radius is currently supported on iOS via a prompt. On Android please use the settings screen (or implement a custom modal).',
+        [{ text: 'OK', style: 'default' }]
+      );
+    }
+  };
+
+  if (!isAuthenticated || !user) {
     return (
       <View style={styles.container}>
-        <Text>Please sign in</Text>
-                    <TouchableOpacity style={styles.backButton} onPress={() => router.push('/(auth)/signIn')}>
-              <Text style={styles.backButtonText}>Sign in</Text>
-            </TouchableOpacity>
+        <Ionicons name="person-circle-outline" size={80} color="#ccc" />
+        <Text style={styles.signInPromptText}>Please sign in to view your profile</Text>
+        <TouchableOpacity
+          style={styles.signInButton}
+          onPress={() => router.push('/(auth)/signIn')}
+        >
+          <Text style={styles.signInButtonText}>Sign In</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <ScrollView  contentContainerStyle={styles.content}>
+    <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
       {/* Profile Header */}
       <View style={styles.header}>
         <View style={styles.avatarContainer}>
@@ -143,9 +258,14 @@ export default function ProfileScreen() {
           )}
           <TouchableOpacity
             style={styles.editAvatarButton}
-            onPress={() => setShowEditProfile(true)}
+            onPress={handleChangeProfilePhoto}
+            disabled={loading}
           >
-            <Ionicons name="camera" size={16} color="#fff" />
+            {loading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons name="camera" size={16} color="#fff" />
+            )}
           </TouchableOpacity>
         </View>
 
@@ -165,6 +285,7 @@ export default function ProfileScreen() {
         {!user.emailVerified && !user.isAnonymous && (
           <TouchableOpacity
             style={styles.verifyBadge}
+            onPress={handleSendVerification}
             disabled={loading}
           >
             <Ionicons name="alert-circle" size={16} color="#FF3B30" />
@@ -243,6 +364,7 @@ export default function ProfileScreen() {
           </View>
           <Switch
             value={userProfile?.settings?.notificationsEnabled ?? true}
+            onValueChange={toggleNotifications}
             trackColor={{ false: '#E5E5EA', true: '#34C759' }}
             thumbColor="#fff"
           />
@@ -256,21 +378,24 @@ export default function ProfileScreen() {
             </View>
             <Switch
               value={userProfile?.settings?.emailNotifications ?? true}
-             
+              onValueChange={toggleEmailNotifications}
               trackColor={{ false: '#E5E5EA', true: '#34C759' }}
               thumbColor="#fff"
             />
           </View>
         )}
 
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={handleAlertRadiusChange}
+        >
           <View style={styles.menuItemLeft}>
             <Ionicons name="location-outline" size={24} color="#007AFF" />
             <Text style={styles.menuItemText}>Alert Radius</Text>
           </View>
           <View style={styles.menuItemRight}>
             <Text style={styles.menuItemValue}>
-              {userProfile?.settings?.alertRadius || 5} km
+              {userProfile?.settings?.alertRadius ?? 5} km
             </Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </View>
@@ -317,7 +442,7 @@ export default function ProfileScreen() {
 
         <TouchableOpacity
           style={[styles.button, styles.deleteButton]}
-          onPress={() => Alert.alert('Notice', 'Account deletion is currently disabled.')}
+          onPress={handleDeleteAccount}
         >
           <Text style={styles.deleteButtonText}>Delete Account</Text>
         </TouchableOpacity>
@@ -327,7 +452,7 @@ export default function ProfileScreen() {
       <EditProfileModal
         visible={showEditProfile}
         onClose={() => setShowEditProfile(false)}
-        currentName={userProfile?.name || ''}
+        currentName={userProfile?.name ?? ''}
       />
 
       <ChangePasswordModal
@@ -338,7 +463,7 @@ export default function ProfileScreen() {
       <ChangeEmailModal
         visible={showChangeEmail}
         onClose={() => setShowChangeEmail(false)}
-        currentEmail={user.email || ''}
+        currentEmail={user.email ?? ''}
       />
 
       <LinkAccountModal
@@ -367,7 +492,7 @@ function EditProfileModal({ visible, onClose, currentName }: EditProfileModalPro
   const onSubmit = async (data: { name: string }) => {
     try {
       setLoading(true);
-    //   await updateUserDisplayProfile({ name: data.name });
+      await updateUserDisplayProfile({ name: data.name });
       Alert.alert('Success', 'Profile updated successfully');
       onClose();
     } catch (error: any) {
@@ -398,7 +523,7 @@ function EditProfileModal({ visible, onClose, currentName }: EditProfileModalPro
               }}
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  style={[styles.input, errors.name && styles.inputError]}
+                  style={[styles.input, (errors as any).name && styles.inputError]}
                   placeholder="Enter your name"
                   onBlur={onBlur}
                   onChangeText={onChange}
@@ -407,8 +532,8 @@ function EditProfileModal({ visible, onClose, currentName }: EditProfileModalPro
               )}
               name="name"
             />
-            {errors.name && (
-              <Text style={styles.errorText}>{errors.name.message}</Text>
+            {(errors as any).name && (
+              <Text style={styles.errorText}>{(errors as any).name.message}</Text>
             )}
           </View>
 
@@ -452,10 +577,10 @@ function ChangePasswordModal({ visible, onClose }: ChangePasswordModalProps) {
   const onSubmit = async (data: any) => {
     try {
       setLoading(true);
-    //   await changePassword({
-    //     currentPassword: data.currentPassword,
-    //     newPassword: data.newPassword,
-    //   });
+      await changePassword({
+        currentPassword: data.currentPassword,
+        newPassword: data.newPassword,
+      });
       Alert.alert('Success', 'Password changed successfully');
       onClose();
     } catch (error: any) {
@@ -476,14 +601,14 @@ function ChangePasswordModal({ visible, onClose }: ChangePasswordModalProps) {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.modalBody}>
+          <ScrollView style={styles.modalBody}>
             <Text style={styles.label}>Current Password</Text>
             <Controller
               control={control}
               rules={{ required: 'Current password is required' }}
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  style={[styles.input, errors.currentPassword && styles.inputError]}
+                  style={[styles.input, (errors as any).currentPassword && styles.inputError]}
                   placeholder="Enter current password"
                   secureTextEntry
                   onBlur={onBlur}
@@ -493,8 +618,8 @@ function ChangePasswordModal({ visible, onClose }: ChangePasswordModalProps) {
               )}
               name="currentPassword"
             />
-            {errors.currentPassword && (
-              <Text style={styles.errorText}>{errors.currentPassword.message}</Text>
+            {(errors as any).currentPassword && (
+              <Text style={styles.errorText}>{(errors as any).currentPassword.message}</Text>
             )}
 
             <Text style={[styles.label, { marginTop: 16 }]}>New Password</Text>
@@ -506,7 +631,7 @@ function ChangePasswordModal({ visible, onClose }: ChangePasswordModalProps) {
               }}
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  style={[styles.input, errors.newPassword && styles.inputError]}
+                  style={[styles.input, (errors as any).newPassword && styles.inputError]}
                   placeholder="Enter new password"
                   secureTextEntry
                   onBlur={onBlur}
@@ -516,8 +641,8 @@ function ChangePasswordModal({ visible, onClose }: ChangePasswordModalProps) {
               )}
               name="newPassword"
             />
-            {errors.newPassword && (
-              <Text style={styles.errorText}>{errors.newPassword.message}</Text>
+            {(errors as any).newPassword && (
+              <Text style={styles.errorText}>{(errors as any).newPassword.message}</Text>
             )}
 
             <Text style={[styles.label, { marginTop: 16 }]}>Confirm Password</Text>
@@ -529,7 +654,7 @@ function ChangePasswordModal({ visible, onClose }: ChangePasswordModalProps) {
               }}
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  style={[styles.input, errors.confirmPassword && styles.inputError]}
+                  style={[styles.input, (errors as any).confirmPassword && styles.inputError]}
                   placeholder="Confirm new password"
                   secureTextEntry
                   onBlur={onBlur}
@@ -539,10 +664,10 @@ function ChangePasswordModal({ visible, onClose }: ChangePasswordModalProps) {
               )}
               name="confirmPassword"
             />
-            {errors.confirmPassword && (
-              <Text style={styles.errorText}>{errors.confirmPassword.message}</Text>
+            {(errors as any).confirmPassword && (
+              <Text style={styles.errorText}>{(errors as any).confirmPassword.message}</Text>
             )}
-          </View>
+          </ScrollView>
 
           <TouchableOpacity
             style={[styles.button, styles.primaryButton]}
@@ -582,10 +707,10 @@ function ChangeEmailModal({ visible, onClose, currentEmail }: ChangeEmailModalPr
   const onSubmit = async (data: any) => {
     try {
       setLoading(true);
-    //   await changeEmail({
-    //     newEmail: data.newEmail,
-    //     currentPassword: data.password,
-    //   });
+      await changeEmail({
+        newEmail: data.newEmail,
+        currentPassword: data.password,
+      });
       Alert.alert('Success', 'Email changed successfully. Please verify your new email.');
       onClose();
     } catch (error: any) {
@@ -626,7 +751,7 @@ function ChangeEmailModal({ visible, onClose, currentEmail }: ChangeEmailModalPr
               }}
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  style={[styles.input, errors.newEmail && styles.inputError]}
+                  style={[styles.input, (errors as any).newEmail && styles.inputError]}
                   placeholder="Enter new email"
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -637,8 +762,8 @@ function ChangeEmailModal({ visible, onClose, currentEmail }: ChangeEmailModalPr
               )}
               name="newEmail"
             />
-            {errors.newEmail && (
-              <Text style={styles.errorText}>{errors.newEmail.message}</Text>
+            {(errors as any).newEmail && (
+              <Text style={styles.errorText}>{(errors as any).newEmail.message}</Text>
             )}
 
             <Text style={[styles.label, { marginTop: 16 }]}>Current Password</Text>
@@ -647,7 +772,7 @@ function ChangeEmailModal({ visible, onClose, currentEmail }: ChangeEmailModalPr
               rules={{ required: 'Password is required' }}
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  style={[styles.input, errors.password && styles.inputError]}
+                  style={[styles.input, (errors as any).password && styles.inputError]}
                   placeholder="Confirm with password"
                   secureTextEntry
                   onBlur={onBlur}
@@ -657,8 +782,8 @@ function ChangeEmailModal({ visible, onClose, currentEmail }: ChangeEmailModalPr
               )}
               name="password"
             />
-            {errors.password && (
-              <Text style={styles.errorText}>{errors.password.message}</Text>
+            {(errors as any).password && (
+              <Text style={styles.errorText}>{(errors as any).password.message}</Text>
             )}
           </View>
 
@@ -680,7 +805,7 @@ function ChangeEmailModal({ visible, onClose, currentEmail }: ChangeEmailModalPr
 }
 
 // ============================================
-// Link Account Modal (for anonymous users)
+// Link Account Modal
 // ============================================
 interface LinkAccountModalProps {
   visible: boolean;
@@ -703,11 +828,11 @@ function LinkAccountModal({ visible, onClose }: LinkAccountModalProps) {
   const onSubmit = async (data: any) => {
     try {
       setLoading(true);
-    //   await linkAnonymousWithEmail({
-    //     email: data.email,
-    //     password: data.password,
-    //     name: data.name,
-    //   });
+      await linkAnonymousWithEmail({
+        email: data.email,
+        password: data.password,
+        name: data.name,
+      });
       Alert.alert('Success', 'Account linked successfully! Please verify your email.');
       onClose();
     } catch (error: any) {
@@ -739,7 +864,7 @@ function LinkAccountModal({ visible, onClose }: LinkAccountModalProps) {
               rules={{ required: 'Name is required' }}
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  style={[styles.input, errors.name && styles.inputError]}
+                  style={[styles.input, (errors as any).name && styles.inputError]}
                   placeholder="Enter your name"
                   onBlur={onBlur}
                   onChangeText={onChange}
@@ -748,8 +873,8 @@ function LinkAccountModal({ visible, onClose }: LinkAccountModalProps) {
               )}
               name="name"
             />
-            {errors.name && (
-              <Text style={styles.errorText}>{errors.name.message}</Text>
+            {(errors as any).name && (
+              <Text style={styles.errorText}>{(errors as any).name.message}</Text>
             )}
 
             <Text style={[styles.label, { marginTop: 16 }]}>Email</Text>
@@ -764,7 +889,7 @@ function LinkAccountModal({ visible, onClose }: LinkAccountModalProps) {
               }}
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  style={[styles.input, errors.email && styles.inputError]}
+                  style={[styles.input, (errors as any).email && styles.inputError]}
                   placeholder="your@email.com"
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -775,8 +900,8 @@ function LinkAccountModal({ visible, onClose }: LinkAccountModalProps) {
               )}
               name="email"
             />
-            {errors.email && (
-              <Text style={styles.errorText}>{errors.email.message}</Text>
+            {(errors as any).email && (
+              <Text style={styles.errorText}>{(errors as any).email.message}</Text>
             )}
 
             <Text style={[styles.label, { marginTop: 16 }]}>Password</Text>
@@ -788,7 +913,7 @@ function LinkAccountModal({ visible, onClose }: LinkAccountModalProps) {
               }}
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  style={[styles.input, errors.password && styles.inputError]}
+                  style={[styles.input, (errors as any).password && styles.inputError]}
                   placeholder="Minimum 6 characters"
                   secureTextEntry
                   onBlur={onBlur}
@@ -798,8 +923,8 @@ function LinkAccountModal({ visible, onClose }: LinkAccountModalProps) {
               )}
               name="password"
             />
-            {errors.password && (
-              <Text style={styles.errorText}>{errors.password.message}</Text>
+            {(errors as any).password && (
+              <Text style={styles.errorText}>{(errors as any).password.message}</Text>
             )}
 
             <Text style={[styles.label, { marginTop: 16 }]}>Confirm Password</Text>
@@ -811,7 +936,7 @@ function LinkAccountModal({ visible, onClose }: LinkAccountModalProps) {
               }}
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  style={[styles.input, errors.confirmPassword && styles.inputError]}
+                  style={[styles.input, (errors as any).confirmPassword && styles.inputError]}
                   placeholder="Re-enter password"
                   secureTextEntry
                   onBlur={onBlur}
@@ -821,8 +946,8 @@ function LinkAccountModal({ visible, onClose }: LinkAccountModalProps) {
               )}
               name="confirmPassword"
             />
-            {errors.confirmPassword && (
-              <Text style={styles.errorText}>{errors.confirmPassword.message}</Text>
+            {(errors as any).confirmPassword && (
+              <Text style={styles.errorText}>{(errors as any).confirmPassword.message}</Text>
             )}
           </ScrollView>
 
@@ -844,29 +969,37 @@ function LinkAccountModal({ visible, onClose }: LinkAccountModalProps) {
 }
 
 // ============================================
-// Styles
-// ============================================
+// Styles (unchanged visual styles from your original)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-    backButton: {
-        margin: 10,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  scrollView: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  signInPromptText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 16,
+    marginBottom: 24,
+  },
+  signInButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
     borderRadius: 8,
   },
-  backButtonText: {
+  signInButtonText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#fff',
   },
   content: {
     paddingBottom: 40,
-    // paddingTop: 40,
   },
   header: {
     backgroundColor: '#fff',
@@ -1013,6 +1146,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 16,
+    marginHorizontal: 16,
   },
   primaryButton: {
     backgroundColor: '#007AFF',
@@ -1026,7 +1160,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#007AFF',
-    marginHorizontal: 16,
   },
   signOutButtonText: {
     color: '#007AFF',
@@ -1037,7 +1170,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#FF3B30',
-    marginHorizontal: 16,
   },
   deleteButtonText: {
     color: '#FF3B30',
