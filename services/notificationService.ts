@@ -251,31 +251,31 @@ export const createTestNotifications = async (userId: string): Promise<void> => 
     const testNotifications = [
       {
         type: 'nearby_alert' as const,
-        title: '🚨 Crime Report Nearby',
+        title: 'Crime Report Nearby',
         message: 'Suspicious activity reported 0.8km from your location',
         reportId: 'test-report-1',
       },
       {
         type: 'comment' as const,
-        title: '💬 New Comment',
+        title: 'New Comment',
         message: 'Someone commented on your Lost Item report',
         reportId: 'test-report-2',
       },
       {
         type: 'upvote' as const,
-        title: '👍 Report Upvoted',
+        title: 'Report Upvoted',
         message: 'Your report received 5 upvotes',
         reportId: 'test-report-3',
       },
       {
         type: 'status_change' as const,
-        title: '✅ Report Resolved',
+        title: 'Report Resolved',
         message: 'A report you are tracking has been marked as resolved',
         reportId: 'test-report-4',
       },
       {
         type: 'new_report' as const,
-        title: '🐕 Missing Pet Alert',
+        title: 'Missing Pet Alert',
         message: 'Lost dog reported near High Street - Golden Retriever',
         reportId: 'test-report-5',
       },
