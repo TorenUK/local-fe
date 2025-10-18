@@ -1,8 +1,11 @@
+import { useNotificationBadge } from "@/hooks/useNotificationBadge";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { Platform, StyleSheet } from "react-native";
 
 export default function TabsLayout() {
+
+  const unreadCount = useNotificationBadge();
 
 
   return (
@@ -77,7 +80,7 @@ export default function TabsLayout() {
             />
           ),
           headerTitle: "Notifications",
-          // tabBarBadge: 1, 
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined, 
         }}
       />
       <Tabs.Screen

@@ -1,8 +1,37 @@
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+// services/storageService.ts - Complete Storage Service
+import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { storage } from '../firebase/config';
 
 /**
- * Upload photos for a report
+ * Upload profile photo to Firebase Storage
+ */
+export const uploadProfilePhoto = async (
+  photoUri: string,
+  userId: string
+): Promise<string> => {
+  try {
+    const filename = `profiles/${userId}.jpg`;
+    const storageRef = ref(storage, filename);
+
+    // Convert URI to blob
+    const response = await fetch(photoUri);
+    const blob = await response.blob();
+
+    // Upload to Firebase Storage
+    await uploadBytes(storageRef, blob);
+
+    // Get download URL
+    const downloadURL = await getDownloadURL(storageRef);
+    console.log('Profile photo uploaded successfully');
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading profile photo:', error);
+    throw new Error('Failed to upload profile photo');
+  }
+};
+
+/**
+ * Upload photos for a report (multiple)
  */
 export const uploadReportPhotos = async (photoUris: string[]): Promise<string[]> => {
   try {
@@ -25,32 +54,38 @@ export const uploadReportPhotos = async (photoUris: string[]): Promise<string[]>
     });
 
     const downloadURLs = await Promise.all(uploadPromises);
-    console.log('Photos uploaded successfully');
+    console.log('Report photos uploaded successfully');
     return downloadURLs;
   } catch (error) {
-    console.error('Error uploading photos:', error);
-    throw error;
+    console.error('Error uploading report photos:', error);
+    throw new Error('Failed to upload photos');
   }
 };
 
 /**
- * Upload profile photo
+ * Delete a photo from storage
  */
-export const uploadProfilePhoto = async (photoUri: string, userId: string): Promise<string> => {
+export const deletePhoto = async (photoUrl: string): Promise<void> => {
   try {
-    const filename = `profiles/${userId}.jpg`;
-    const storageRef = ref(storage, filename);
-
-    const response = await fetch(photoUri);
-    const blob = await response.blob();
-
-    await uploadBytes(storageRef, blob);
-    const downloadURL = await getDownloadURL(storageRef);
-
-    console.log('Profile photo uploaded successfully');
-    return downloadURL;
+    const photoRef = ref(storage, photoUrl);
+    await deleteObject(photoRef);
+    console.log('Photo deleted successfully');
   } catch (error) {
-    console.error('Error uploading profile photo:', error);
-    throw error;
+    console.error('Error deleting photo:', error);
+    throw new Error('Failed to delete photo');
+  }
+};
+
+/**
+ * Delete multiple photos
+ */
+export const deletePhotos = async (photoUrls: string[]): Promise<void> => {
+  try {
+    const deletePromises = photoUrls.map((url) => deletePhoto(url));
+    await Promise.all(deletePromises);
+    console.log('Photos deleted successfully');
+  } catch (error) {
+    console.error('Error deleting photos:', error);
+    throw new Error('Failed to delete photos');
   }
 };

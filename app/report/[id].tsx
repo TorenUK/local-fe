@@ -1,5 +1,6 @@
 // app/report/[id].tsx - Full Report Details Screen
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -7,7 +8,6 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  Image,
   ScrollView,
   Share,
   StyleSheet,
@@ -47,6 +47,10 @@ export default function ReportDetailsScreen() {
   const [hasUpvoted, setHasUpvoted] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [showCommentInput, setShowCommentInput] = useState(false);
+  const [photoLoading, setPhotoLoading] = useState(false);
+
+
+  console.log(report?.metadata);
 
   const {
     control,
@@ -139,7 +143,7 @@ export default function ReportDetailsScreen() {
 
     try {
       setActionLoading(true);
-      await upvoteReport(report.id);
+      await upvoteReport(report.id, user.uid);
       setHasUpvoted(true);
       Alert.alert('Success', 'Report upvoted!');
     } catch (error: any) {
@@ -349,17 +353,31 @@ export default function ReportDetailsScreen() {
           <ScrollView
             horizontal
             pagingEnabled
-            showsHorizontalScrollIndicator={false}
+            showsHorizontalScrollIndicator={true}
             style={styles.photosCarousel}
           >
-            {report.photos.map((photo, index) => (
-              <Image
-                key={index}
-                source={{ uri: photo }}
-                style={styles.photo}
-                resizeMode="cover"
-              />
-            ))}
+            {report.photos.map((photo, index) => {
+
+
+  return (
+    <View key={index}>
+      {photoLoading && (
+        <ActivityIndicator
+          size="small"
+          color="#FF0000"
+          style={StyleSheet.absoluteFill}
+        />
+      )}
+      <Image
+        source={{ uri: photo }}
+        style={styles.photo}
+        contentFit="cover"
+        onLoadStart={() => setPhotoLoading(true)}
+        onLoadEnd={() => setPhotoLoading(false)}
+      />
+    </View>
+  );
+})}
           </ScrollView>
         )}
 
@@ -750,6 +768,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  photoWrapper: {
+  width: 300,
+  height: 200,
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: '#111', // fallback color
+},
   content: {
     paddingBottom: 40,
   },

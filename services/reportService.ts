@@ -224,9 +224,6 @@ function getTypeEmoji(type: ReportType): string {
   return emojis[type] || '📢';
 }
 
-// ============================================
-// services/commentsService.ts - UPDATE createComment
-// ============================================
 
 /**
  * Enhanced createComment with automatic notifications
@@ -318,9 +315,7 @@ async function notifyTrackingUsers(
   }
 }
 
-// ============================================
 // Update upvoteReport to notify
-// ============================================
 
 export const upvoteReport = async (reportId: string, voterId: string): Promise<void> => {
   try {
@@ -524,9 +519,6 @@ export const subscribeToReport = (
   });
 };
 
-// ============================================
-// Update status change to notify
-// ============================================
 
 export const updateReportStatus = async (
   reportId: string,
@@ -590,10 +582,6 @@ export const updateReportStatus = async (
     throw error;
   }
 };
-
-// ============================================
-// Quick Test Function (Add to Profile or Settings)
-// ============================================
 
 /**
  * Send yourself a test notification

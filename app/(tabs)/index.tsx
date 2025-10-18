@@ -310,9 +310,9 @@ const filteredReports = region
   );
 }
 
-// ============================================
+
 // Report Detail Modal
-// ============================================
+
 interface ReportDetailModalProps {
   report: Report;
   onClose: () => void;
