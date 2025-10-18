@@ -190,7 +190,7 @@ async function notifyNearbyUsers(
         createNotification(
           userId,
           'nearby_alert',
-          `$${typeLabel} Nearby`,
+          `${typeLabel} Nearby`,
           description.substring(0, 100),
           reportId
         )
