@@ -11,28 +11,31 @@ import {
 } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../hooks/useAuth';
 import {
   callEmergency,
-  clearAllNotifications,
+  createTestNotifications,
+  deleteAllNotifications,
   EmergencyContact,
   getEmergencyNumbers,
+  markAllAsRead,
   registerForPushNotifications,
   savePushToken,
 } from '../../services/notificationService';
 
 interface NotificationItem {
   id: string;
-  type: 'new_report' | 'comment' | 'upvote' | 'nearby_alert';
+  type: 'new_report' | 'comment' | 'upvote' | 'nearby_alert' | 'status_change';
   title: string;
   message: string;
   reportId?: string;
@@ -49,12 +52,13 @@ export default function NotificationsScreen() {
   const [emergencyNumbers] = useState<EmergencyContact[]>(getEmergencyNumbers());
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
-    // Setup push notifications
     setupPushNotifications();
 
-    // Listen for notifications from Firestore
     const q = query(
       collection(db, 'notifications'),
       where('userId', '==', user.uid),
@@ -62,18 +66,28 @@ export default function NotificationsScreen() {
       limit(50)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const notifs: NotificationItem[] = [];
-      snapshot.forEach((doc) => {
-        notifs.push({
-          id: doc.id,
-          ...doc.data(),
-        } as NotificationItem);
-      });
-      setNotifications(notifs);
-      setLoading(false);
-      setRefreshing(false);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const notifs: NotificationItem[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          notifs.push({
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt || Timestamp.now(),
+          } as NotificationItem);
+        });
+        setNotifications(notifs);
+        setLoading(false);
+        setRefreshing(false);
+      },
+      (error) => {
+        console.error('Error loading notifications:', error);
+        setLoading(false);
+        setRefreshing(false);
+      }
+    );
 
     return () => unsubscribe();
   }, [user]);
@@ -93,7 +107,6 @@ export default function NotificationsScreen() {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    // Notifications will refresh via Firestore listener
   };
 
   const handleClearAll = async () => {
@@ -106,12 +119,28 @@ export default function NotificationsScreen() {
           text: 'Clear',
           style: 'destructive',
           onPress: async () => {
-            await clearAllNotifications();
-            // You might want to also mark them as read in Firestore
+            if (user) {
+              await deleteAllNotifications(user.uid);
+              Alert.alert('Success', 'All notifications cleared');
+            }
           },
         },
       ]
     );
+  };
+
+  const handleMarkAllRead = async () => {
+    if (!user) return;
+    try {
+      await markAllAsRead(user.uid);
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
+
+  const handleCreateTestNotifications = async () => {
+    if (!user) return;
+    await createTestNotifications(user.uid);
   };
 
   const handleEmergencyCall = (contact: EmergencyContact) => {
@@ -134,6 +163,8 @@ export default function NotificationsScreen() {
         return 'arrow-up-circle';
       case 'nearby_alert':
         return 'location';
+      case 'status_change':
+        return 'checkmark-circle';
       default:
         return 'notifications';
     }
@@ -149,6 +180,8 @@ export default function NotificationsScreen() {
         return '#34C759';
       case 'nearby_alert':
         return '#FF9500';
+      case 'status_change':
+        return '#5856D6';
       default:
         return '#007AFF';
     }
@@ -168,6 +201,8 @@ export default function NotificationsScreen() {
     if (days < 7) return `${days}d ago`;
     return date.toLocaleDateString();
   };
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
     <ScrollView
@@ -218,22 +253,51 @@ export default function NotificationsScreen() {
       {/* Notifications Section */}
       <View style={styles.notificationsSection}>
         <View style={styles.notificationsSectionHeader}>
-          <Text style={styles.sectionTitle}>
-            Notifications ({notifications.length})
-          </Text>
-          {notifications.length > 0 && (
-            <TouchableOpacity
-              style={styles.clearButton}
-              onPress={handleClearAll}
-            >
-              <Text style={styles.clearButtonText}>Clear All</Text>
-            </TouchableOpacity>
-          )}
+          <View>
+            <Text style={styles.sectionTitle}>
+              Notifications ({notifications.length})
+            </Text>
+            {unreadCount > 0 && (
+              <Text style={styles.unreadCount}>
+                {unreadCount} unread
+              </Text>
+            )}
+          </View>
+          <View style={styles.headerActions}>
+            {unreadCount > 0 && (
+              <TouchableOpacity
+                style={styles.markReadButton}
+                onPress={handleMarkAllRead}
+              >
+                <Ionicons name="checkmark-done" size={18} color="#007AFF" />
+              </TouchableOpacity>
+            )}
+            {notifications.length > 0 && (
+              <TouchableOpacity
+                style={styles.clearButton}
+                onPress={handleClearAll}
+              >
+                <Ionicons name="trash-outline" size={18} color="#FF3B30" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
+        {/* Test Notifications Button (Dev Only) */}
+        {__DEV__ && notifications.length === 0 && !loading && (
+          <TouchableOpacity
+            style={styles.testButton}
+            onPress={handleCreateTestNotifications}
+          >
+            <Ionicons name="flask" size={20} color="#007AFF" />
+            <Text style={styles.testButtonText}>Create Test Notifications</Text>
+          </TouchableOpacity>
+        )}
+
         {loading ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>Loading...</Text>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#007AFF" />
+            <Text style={styles.loadingText}>Loading notifications...</Text>
           </View>
         ) : notifications.length === 0 ? (
           <View style={styles.emptyState}>
@@ -394,15 +458,48 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#000',
   },
-  clearButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#F2F2F7',
+  unreadCount: {
+    fontSize: 12,
+    color: '#007AFF',
+    marginTop: 2,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  markReadButton: {
+    padding: 8,
+    backgroundColor: '#E8F4FF',
     borderRadius: 8,
   },
-  clearButtonText: {
+  clearButton: {
+    padding: 8,
+    backgroundColor: '#FFEBEE',
+    borderRadius: 8,
+  },
+  testButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#E8F4FF',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    marginBottom: 16,
+  },
+  testButtonText: {
     fontSize: 14,
     fontWeight: '600',
+    color: '#007AFF',
+  },
+  loadingContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
     color: '#666',
   },
   emptyState: {
