@@ -1,8 +1,8 @@
 import { Expo, ExpoPushMessage } from "expo-server-sdk";
 import * as admin from "firebase-admin";
 import {
-    onDocumentCreated,
-    onDocumentUpdated,
+  onDocumentCreated,
+  onDocumentUpdated,
 } from "firebase-functions/v2/firestore";
 import { setGlobalOptions } from "firebase-functions/v2/options";
 import { onSchedule } from "firebase-functions/v2/scheduler";
@@ -174,7 +174,7 @@ export const onReportCreated = onDocumentCreated(
       const typeLabel = typeLabels[reportType] || "New Report";
 
       const notification: NotificationPayload = {
-        title: `🚨 ${typeLabel} Nearby`,
+        title: `${typeLabel} Nearby`,
         body: reportData.description.substring(0, 100),
         data: {
           type: "nearby_alert",
@@ -259,7 +259,7 @@ export const onCommentCreated = onDocumentCreated(
       }
 
       const notification: NotificationPayload = {
-        title: "💬 New Comment",
+        title: "New Comment",
         body: `Someone commented on a report you're tracking: "${commentData.content.substring(
           0,
           80
@@ -327,7 +327,7 @@ export const onReportStatusChanged = onDocumentUpdated(
       }
 
       const notification: NotificationPayload = {
-        title: "✅ Report Updated",
+        title: "Report Updated",
         body: `A report you're tracking has been marked as ${afterData.status}`,
         data: {
           type: "status_change",

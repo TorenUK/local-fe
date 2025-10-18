@@ -137,7 +137,7 @@ export const createReport = async (
       await createNotification(
         userId,
         'new_report',
-        '✅ Report Created',
+        'Report Created',
         `Your ${getTypeLabel(data.type)} has been published`,
         docRef.id
       );
@@ -190,7 +190,7 @@ async function notifyNearbyUsers(
         createNotification(
           userId,
           'nearby_alert',
-          `${emoji} ${typeLabel} Nearby`,
+          `$${typeLabel} Nearby`,
           description.substring(0, 100),
           reportId
         )
@@ -259,7 +259,7 @@ export const createComment = async (data: CreateCommentData): Promise<string> =>
         await createNotification(
           reportData.userId,
           'comment',
-          '💬 New Comment',
+          'New Comment',
           `Someone commented: "${data.content.substring(0, 80)}..."`,
           data.reportId
         );
@@ -304,7 +304,7 @@ async function notifyTrackingUsers(
           createNotification(
             userId,
             'comment',
-            '💬 New Comment',
+            'New Comment',
             `Someone commented on a tracked report: "${content.substring(0, 80)}..."`,
             reportId
           )
@@ -342,7 +342,7 @@ export const upvoteReport = async (reportId: string, voterId: string): Promise<v
       await createNotification(
         reportData.userId,
         'upvote',
-        '👍 New Upvote',
+        'New Upvote',
         'Someone upvoted your report',
         reportId
       );
