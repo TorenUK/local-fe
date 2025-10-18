@@ -35,6 +35,25 @@ interface Report {
   upvotes: number;
 }
 
+function getDistanceFromLatLonInKm(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+) {
+  const R = 6371; // Radius of the earth in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in km
+}
+
 export default function MapScreen() {
   const mapRef = useRef<MapView>(null);
   const { user, userProfile } = useAuth();
@@ -138,7 +157,27 @@ export default function MapScreen() {
     }
   };
 
-  const filteredReports = reports.filter((report) => filters[report.type]);
+  // const filteredReports = reports.filter((report) => filters[report.type]);
+  const alertRadiusKm = userProfile?.settings?.alertRadius || 5;
+
+const filteredReports = region
+  ? reports.filter(
+      (report) =>
+        filters[report.type] &&
+        Math.sqrt(
+          Math.pow(
+            (report.location.latitude - region.latitude) * 111,
+            2
+          ) +
+            Math.pow(
+              (report.location.longitude - region.longitude) *
+                111 *
+                Math.cos((region.latitude * Math.PI) / 180),
+              2
+            )
+        ) <= (userProfile?.settings?.alertRadius || 5)
+    )
+  : [];
 
   if (loading || !region) {
     return (
@@ -167,7 +206,7 @@ export default function MapScreen() {
         <View style={styles.anonymousBanner}>
           <Ionicons name="information-circle" size={20} color="#FF9500" />
           <Text style={styles.anonymousBannerText}>
-            Browsing as guest • Create account to submit reports
+            Viewing as guest • Create account to submit reports
           </Text>
         </View>
       )}
