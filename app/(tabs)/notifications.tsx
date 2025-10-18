@@ -213,7 +213,7 @@ export default function NotificationsScreen() {
       }
     >
       {/* Emergency Services Section */}
-      <View style={styles.emergencySection}>
+      {/* <View style={styles.emergencySection}>
         <Text style={styles.emergencySectionTitle}>🚨 Emergency Services</Text>
         <Text style={styles.emergencySectionSubtitle}>
           Quick access to emergency contacts
@@ -248,7 +248,7 @@ export default function NotificationsScreen() {
             </View>
           </TouchableOpacity>
         ))}
-      </View>
+      </View> */}
 
       {/* Notifications Section */}
       <View style={styles.notificationsSection}>
