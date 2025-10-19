@@ -787,7 +787,7 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     zIndex: 10,
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    backgroundColor: "#121212",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
@@ -803,7 +803,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#000",
+    color: "#fff",
   },
   headerRight: {
     flexDirection: "row",
@@ -880,6 +880,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
     backgroundColor: "#007AFF",
     paddingVertical: 16,
+    marginVertical: 10,
     borderRadius: 12,
     flexDirection: "row",
     justifyContent: "center",
@@ -917,10 +918,11 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: "center",
     zIndex: 1,
+    marginVertical: 8,
   },
   watermarkText: {
     fontSize: 11,
-    color: "rgba(0, 0, 0, 0.2)",
+    color: "rgba(255, 255, 255, 0.38)",
     fontWeight: "500",
   },
   modalOverlay: {
