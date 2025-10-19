@@ -2,12 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import {
   collection,
+  doc,
   limit,
   onSnapshot,
   orderBy,
   query,
   Timestamp,
-  where,
+  updateDoc,
+  where
 } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
@@ -140,11 +142,20 @@ export default function NotificationsScreen() {
     await createTestNotifications(user.uid);
   };
 
-  const handleNotificationPress = (notification: NotificationItem) => {
+const handleNotificationPress = async (notification: NotificationItem) => {
+  try {
+    if (!notification.read) {
+      const notifRef = doc(db, 'notifications', notification.id);
+      await updateDoc(notifRef, { read: true });
+    }
+
     if (notification.reportId) {
       router.push(`/report/${notification.reportId}`);
     }
-  };
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+  }
+};
 
   const getNotificationIcon = (type: NotificationItem['type']) => {
     switch (type) {
@@ -205,43 +216,6 @@ export default function NotificationsScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
       }
     >
-      {/* Emergency Services Section */}
-      {/* <View style={styles.emergencySection}>
-        <Text style={styles.emergencySectionTitle}>🚨 Emergency Services</Text>
-        <Text style={styles.emergencySectionSubtitle}>
-          Quick access to emergency contacts
-        </Text>
-
-        {emergencyNumbers.map((contact, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.emergencyCard}
-            onPress={() => handleEmergencyCall(contact)}
-          >
-            <View
-              style={[
-                styles.emergencyIcon,
-                index === 0 && styles.emergencyIconPrimary,
-              ]}
-            >
-              <Ionicons
-                name={index === 0 ? 'call' : 'call-outline'}
-                size={24}
-                color={index === 0 ? '#fff' : '#FF3B30'}
-              />
-            </View>
-            <View style={styles.emergencyContent}>
-              <Text style={styles.emergencyName}>{contact.name}</Text>
-              <Text style={styles.emergencyDescription}>
-                {contact.description}
-              </Text>
-            </View>
-            <View style={styles.emergencyNumber}>
-              <Text style={styles.emergencyNumberText}>{contact.number}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </View> */}
 
       {/* Notifications Section */}
       <View style={styles.notificationsSection}>
