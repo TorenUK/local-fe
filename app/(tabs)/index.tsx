@@ -23,8 +23,7 @@ import {
 import MapView, {
   Circle,
   Marker,
-  PROVIDER_GOOGLE,
-  Region,
+  Region
 } from "react-native-maps";
 import { useAuth } from "../../hooks/useAuth";
 import { useReports } from "../../hooks/useReport";
@@ -227,7 +226,7 @@ const filteredReports = region
         region={region}
         showsUserLocation
         showsMyLocationButton={false}
-        provider={PROVIDER_GOOGLE}
+        // provider={PROVIDER_GOOGLE}
         // onRegionChangeComplete={setRegion}
       >
         {/* User Location Radius */}
