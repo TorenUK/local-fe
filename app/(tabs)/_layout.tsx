@@ -1,11 +1,14 @@
 import { useNotificationBadge } from "@/hooks/useNotificationBadge";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { Platform, StyleSheet } from "react-native";
+import { Platform, StyleSheet, useColorScheme } from "react-native";
 
 export default function TabsLayout() {
 
   const unreadCount = useNotificationBadge();
+  const colorScheme = useColorScheme(); 
+  const backgroundColor = colorScheme === 'dark' ? '#000' : '#fff';
+
 
 
   return (
@@ -14,9 +17,9 @@ export default function TabsLayout() {
         tabBarActiveTintColor: "#007AFF",
         tabBarInactiveTintColor: "#8E8E93",
         tabBarStyle: {
-          backgroundColor: "#fff",
+          backgroundColor: backgroundColor,
           borderTopWidth: 1,
-          borderTopColor: "#E5E5EA",
+          borderTopColor: "#007AFF",
           paddingTop: 8,
           paddingBottom: Platform.OS === "ios" ? 20 : 8,
           height: Platform.OS === "ios" ? 88 : 64,
@@ -26,11 +29,11 @@ export default function TabsLayout() {
           fontWeight: "600",
         },
         headerStyle: {
-          backgroundColor: "#fff",
+          backgroundColor: backgroundColor,
           elevation: 0,
           shadowOpacity: 0,
           borderBottomWidth: 1,
-          borderBottomColor: "#E5E5EA",
+          borderBottomColor: "#007AFF",
         },
         headerTitleStyle: {
           fontWeight: "bold",

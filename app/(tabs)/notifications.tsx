@@ -20,7 +20,8 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  useColorScheme,
+  View
 } from 'react-native';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../hooks/useAuth';
@@ -48,6 +49,8 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const colorScheme = useColorScheme(); 
+  const backgroundColor = colorScheme === 'dark' ? '#000' : '#fff';
   
 
   useEffect(() => {
@@ -411,7 +414,9 @@ const styles = StyleSheet.create({
   },
   notificationsSection: {
     backgroundColor: '#fff',
-    padding: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
     marginBottom: 12,
   },
   notificationsSectionHeader: {

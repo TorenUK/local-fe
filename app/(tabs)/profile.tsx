@@ -16,6 +16,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useColorScheme
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
 import {
@@ -34,6 +35,9 @@ export default function ProfileScreen() {
   const { user, userProfile, isAuthenticated } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+
+  const colorScheme = useColorScheme(); 
+  const backgroundColor = colorScheme === 'dark' ? '#000' : '#fff';
 
   // Modal states
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -968,8 +972,7 @@ function LinkAccountModal({ visible, onClose }: LinkAccountModalProps) {
   );
 }
 
-// ============================================
-// Styles (unchanged visual styles from your original)
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1004,7 +1007,8 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#fff',
     alignItems: 'center',
-    paddingVertical: 32,
+    paddingBottom: 22,
+    paddingTop: 60,
     paddingHorizontal: 24,
   },
   avatarContainer: {
@@ -1101,6 +1105,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     backgroundColor: '#fff',
     paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   sectionTitle: {
     fontSize: 13,
