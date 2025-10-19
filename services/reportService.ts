@@ -184,7 +184,7 @@ async function notifyNearbyUsers(
       // For now, we'll notify all users (you can add distance check later)
       
       const typeLabel = getTypeLabel(reportType);
-      const emoji = getTypeEmoji(reportType);
+      // const emoji = getTypeEmoji(reportType);
 
       notificationPromises.push(
         createNotification(
@@ -214,15 +214,15 @@ function getTypeLabel(type: ReportType): string {
   return labels[type] || 'Report';
 }
 
-function getTypeEmoji(type: ReportType): string {
-  const emojis = {
-    crime: '🚨',
-    lost_item: '🔍',
-    missing_pet: '🐕',
-    hazard: '⚠️',
-  };
-  return emojis[type] || '📢';
-}
+// function getTypeEmoji(type: ReportType): string {
+//   const emojis = {
+//     crime: '🚨',
+//     lost_item: '🔍',
+//     missing_pet: '🐕',
+//     hazard: '⚠️',
+//   };
+//   return emojis[type] || '📢';
+// }
 
 
 /**
@@ -583,9 +583,6 @@ export const updateReportStatus = async (
   }
 };
 
-/**
- * Send yourself a test notification
- */
 export const sendTestNotification = async (userId: string): Promise<void> => {
   await createNotification(
     userId,

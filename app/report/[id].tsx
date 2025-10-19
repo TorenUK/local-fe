@@ -4,6 +4,8 @@ import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
+import { getUpvotedReports, saveUpvotedReport } from '../../utils/upvoteStorage';
+
 import {
   ActivityIndicator,
   Alert,
@@ -48,9 +50,8 @@ export default function ReportDetailsScreen() {
   const [actionLoading, setActionLoading] = useState(false);
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
-
-
-  console.log(report?.metadata);
+  
+  
 
   const {
     control,
@@ -62,6 +63,16 @@ export default function ReportDetailsScreen() {
       comment: '',
     },
   });
+
+  useEffect(() => {
+  const checkUpvoted = async () => {
+    if (user && report) {
+      const upvoted = await getUpvotedReports(user.uid);
+      setHasUpvoted(upvoted.includes(report.id));
+    }
+  };
+  checkUpvoted();
+}, [user, report?.id]);
 
   // Load comments
   useEffect(() => {
@@ -133,25 +144,26 @@ export default function ReportDetailsScreen() {
     }
   };
 
-  const handleUpvote = async () => {
-    if (!user || !report) return;
+const handleUpvote = async () => {
+  if (!user || !report) return;
 
-    if (hasUpvoted) {
-      Alert.alert('Already Upvoted', 'You have already upvoted this report.');
-      return;
-    }
+  if (hasUpvoted) {
+    Alert.alert('Already Upvoted', 'You have already upvoted this report.');
+    return;
+  }
 
-    try {
-      setActionLoading(true);
-      await upvoteReport(report.id, user.uid);
-      setHasUpvoted(true);
-      Alert.alert('Success', 'Report upvoted!');
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  try {
+    setActionLoading(true);
+    await upvoteReport(report.id, user.uid);
+    await saveUpvotedReport(user.uid, report.id);
+    setHasUpvoted(true);
+    Alert.alert('Success', 'Report upvoted!');
+  } catch (error: any) {
+    Alert.alert('Error', error.message);
+  } finally {
+    setActionLoading(false);
+  }
+};
 
   const handleTrack = async () => {
     if (!user || !report) return;

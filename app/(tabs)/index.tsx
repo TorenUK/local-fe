@@ -1,5 +1,14 @@
+import { db } from "@/firebase/config";
+import { createNotification } from "@/services/notificationService";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from "expo-router";
+import {
+  doc,
+  getDoc,
+  increment,
+  updateDoc
+} from 'firebase/firestore';
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -20,6 +29,7 @@ import MapView, {
 import { useAuth } from "../../hooks/useAuth";
 import { useReports } from "../../hooks/useReport";
 import { getCurrentPosition } from "../../services/locationService";
+import { trackReport, untrackReport } from '../../services/reportService';
 
 interface Report {
   id: string;
@@ -286,7 +296,7 @@ const filteredReports = region
 
       {/* Report Detail Modal */}
       {selectedReport && (
-        <ReportDetailModal
+        <ReportDetailModalComplete
           report={selectedReport}
           onClose={() => setSelectedReport(null)}
         />
@@ -307,145 +317,6 @@ const filteredReports = region
         </Text>
       </View>
     </View>
-  );
-}
-
-
-// Report Detail Modal
-
-interface ReportDetailModalProps {
-  report: Report;
-  onClose: () => void;
-}
-
-function ReportDetailModal({ report, onClose }: ReportDetailModalProps) {
-  const router = useRouter();
-
-  const getTypeLabel = (type: Report["type"]) => {
-    switch (type) {
-      case "crime":
-        return "Crime Report";
-      case "lost_item":
-        return "Lost Item";
-      case "missing_pet":
-        return "Missing Pet";
-      case "hazard":
-        return "Hazard";
-      default:
-        return "Report";
-    }
-  };
-
-  const getTypeColor = (type: Report["type"]) => {
-    switch (type) {
-      case "crime":
-        return "#FF3B30";
-      case "lost_item":
-        return "#FF9500";
-      case "missing_pet":
-        return "#34C759";
-      case "hazard":
-        return "#FFCC00";
-      default:
-        return "#007AFF";
-    }
-  };
-
-  return (
-    <Modal
-      visible={true}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <View style={styles.modalHeaderLeft}>
-              <View
-                style={[
-                  styles.modalTypeIcon,
-                  { backgroundColor: getTypeColor(report.type) },
-                ]}
-              >
-                <Ionicons name="warning" size={20} color="#fff" />
-              </View>
-              <Text style={styles.modalTitle}>{getTypeLabel(report.type)}</Text>
-            </View>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={28} color="#000" />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.modalBody}>
-            <View style={styles.modalSection}>
-              <Text style={styles.modalLabel}>Description</Text>
-              <Text style={styles.modalText}>{report.description}</Text>
-            </View>
-
-            <View style={styles.modalSection}>
-              <Text style={styles.modalLabel}>Status</Text>
-              <View style={styles.statusBadge}>
-                <View
-                  style={[
-                    styles.statusDot,
-                    {
-                      backgroundColor:
-                        report.status === "open" ? "#34C759" : "#8E8E93",
-                    },
-                  ]}
-                />
-                <Text style={styles.statusText}>
-                  {report.status === "open" ? "Active" : "Resolved"}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.modalSection}>
-              <Text style={styles.modalLabel}>Reported</Text>
-              <Text style={styles.modalText}>
-                {new Date(report.createdAt).toLocaleString()}
-              </Text>
-            </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.actionButton}>
-                <Ionicons name="arrow-up" size={20} color="#007AFF" />
-                <Text style={styles.actionButtonText}>
-                  Upvote ({report.upvotes})
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.actionButton}>
-                <Ionicons name="chatbubble-outline" size={20} color="#007AFF" />
-                <Text style={styles.actionButtonText}>Comment</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.actionButton}>
-                <Ionicons name="bookmark-outline" size={20} color="#007AFF" />
-                <Text style={styles.actionButtonText}>Track</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-
-          <TouchableOpacity
-            style={styles.viewDetailsButton}
-            onPress={() => {
-              onClose();
-              // Navigate to full report details
-
-              router.push({
-                pathname: "/report/[id]",
-                params: { id: report.id },
-              });
-            }}
-          >
-            <Text style={styles.viewDetailsButtonText}>View Full Details</Text>
-            <Ionicons name="chevron-forward" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
   );
 }
 
@@ -587,6 +458,309 @@ function FilterModal({ visible, filters, onClose, onApply }: FilterModalProps) {
   );
 }
 
+// Report Detail Modal
+
+interface ReportDetailModalProps {
+  report: Report;
+  onClose: () => void;
+}
+
+/**
+ * Get list of reports user has upvoted (React Native version)
+ */
+const getUpvotedReportsRN = async (userId: string): Promise<string[]> => {
+  try {
+    const key = `upvoted_${userId}`;
+    const stored = await AsyncStorage.getItem(key);
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error('Error getting upvoted reports:', error);
+    return [];
+  }
+};
+
+/**
+ * Save upvoted report (React Native version)
+ */
+const saveUpvotedReportRN = async (userId: string, reportId: string): Promise<void> => {
+  try {
+    const key = `upvoted_${userId}`;
+    const upvoted = await getUpvotedReportsRN(userId);
+    
+    if (!upvoted.includes(reportId)) {
+      upvoted.push(reportId);
+      await AsyncStorage.setItem(key, JSON.stringify(upvoted));
+    }
+  } catch (error) {
+    console.error('Error saving upvoted report:', error);
+  }
+};
+
+function ReportDetailModalComplete({ report, onClose }: ReportDetailModalProps) {
+  const router = useRouter();
+  const { user, userProfile } = useAuth();
+  
+  const [isTracking, setIsTracking] = useState(false);
+  const [hasUpvoted, setHasUpvoted] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [localUpvotes, setLocalUpvotes] = useState(report.upvotes);
+
+  // Check if user is tracking
+  useEffect(() => {
+    if (userProfile && report) {
+      setIsTracking(userProfile.trackedReports?.includes(report.id) || false);
+    }
+  }, [userProfile, report]);
+
+  // Check if user has upvoted (async for RN)
+  useEffect(() => {
+    const checkUpvoted = async () => {
+      if (user) {
+        const upvoted = await getUpvotedReportsRN(user.uid);
+        setHasUpvoted(upvoted.includes(report.id));
+      }
+    };
+    checkUpvoted();
+  }, [user, report.id]);
+
+  const handleUpvote = async () => {
+    if (!user) {
+      Alert.alert('Sign In Required', 'Please sign in to upvote reports.');
+      return;
+    }
+
+    if (hasUpvoted) {
+      Alert.alert('Already Upvoted', 'You have already upvoted this report.');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      await upvoteReport(report.id, user.uid);
+      await saveUpvotedReportRN(user.uid, report.id);
+      
+      setHasUpvoted(true);
+      setLocalUpvotes(prev => prev + 1);
+      Alert.alert('Success', 'Report upvoted!');
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleTrack = async () => {
+    if (!user) {
+      Alert.alert('Sign In Required', 'Please sign in to track reports.');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      if (isTracking) {
+        await untrackReport(user.uid, report.id);
+        setIsTracking(false);
+        Alert.alert('Success', 'Report untracked');
+      } else {
+        await trackReport(user.uid, report.id);
+        setIsTracking(true);
+        Alert.alert('Success', 'Report tracked! You will receive updates.');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleComment = () => {
+    onClose();
+    router.push({
+      pathname: "/report/[id]",
+      params: { id: report.id, scrollTo: 'comments' },
+    });
+  };
+
+  const getTypeLabel = (type: Report["type"]) => {
+    const labels = {
+      crime: "Crime Report",
+      lost_item: "Lost Item",
+      missing_pet: "Missing Pet",
+      hazard: "Hazard",
+    };
+    return labels[type] || "Report";
+  };
+
+  const getTypeColor = (type: Report["type"]) => {
+    const colors = {
+      crime: "#FF3B30",
+      lost_item: "#FF9500",
+      missing_pet: "#34C759",
+      hazard: "#FFCC00",
+    };
+    return colors[type] || "#007AFF";
+  };
+
+  return (
+    <Modal visible={true} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <View style={styles.modalHeaderLeft}>
+              <View style={[styles.modalTypeIcon, { backgroundColor: getTypeColor(report.type) }]}>
+                <Ionicons name="warning" size={20} color="#fff" />
+              </View>
+              <Text style={styles.modalTitle}>{getTypeLabel(report.type)}</Text>
+            </View>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={28} color="#000" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalBody}>
+            <View style={styles.modalSection}>
+              <Text style={styles.modalLabel}>Description</Text>
+              <Text style={styles.modalText}>{report.description}</Text>
+            </View>
+
+            <View style={styles.modalSection}>
+              <Text style={styles.modalLabel}>Status</Text>
+              <View style={styles.statusBadge}>
+                <View style={[styles.statusDot, { backgroundColor: report.status === "open" ? "#34C759" : "#8E8E93" }]} />
+                <Text style={styles.statusText}>{report.status === "open" ? "Active" : "Resolved"}</Text>
+              </View>
+            </View>
+
+            <View style={styles.modalSection}>
+              <Text style={styles.modalLabel}>Reported</Text>
+              <Text style={styles.modalText}>{new Date(report.createdAt).toLocaleString()}</Text>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={[styles.actionButton, hasUpvoted && styles.actionButtonActive]}
+                onPress={handleUpvote}
+                disabled={actionLoading || hasUpvoted}
+              >
+                <Ionicons name={hasUpvoted ? "arrow-up" : "arrow-up-outline"} size={20} color={hasUpvoted ? "#fff" : "#007AFF"} />
+                <Text style={[styles.actionButtonText, hasUpvoted && styles.actionButtonTextActive]}>
+                  {hasUpvoted ? 'Upvoted' : 'Upvote'} ({localUpvotes})
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.actionButton} onPress={handleComment}>
+                <Ionicons name="chatbubble-outline" size={20} color="#007AFF" />
+                <Text style={styles.actionButtonText}>Comment</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.actionButton, isTracking && styles.actionButtonActive]}
+                onPress={handleTrack}
+                disabled={actionLoading}
+              >
+                <Ionicons name={isTracking ? "bookmark" : "bookmark-outline"} size={20} color={isTracking ? "#fff" : "#007AFF"} />
+                <Text style={[styles.actionButtonText, isTracking && styles.actionButtonTextActive]}>
+                  {isTracking ? 'Tracking' : 'Track'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+
+          <TouchableOpacity
+            style={styles.viewDetailsButton}
+            onPress={() => {
+              onClose();
+              router.push({ pathname: "/report/[id]", params: { id: report.id } });
+            }}
+          >
+            <Text style={styles.viewDetailsButtonText}>View Full Details</Text>
+            <Ionicons name="chevron-forward" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ============================================
+// Helper Functions for Upvote Tracking
+// ============================================
+
+/**
+ * Get list of reports user has upvoted (from AsyncStorage)
+ */
+const getUpvotedReports = (userId: string): string[] => {
+  try {
+    const key = `upvoted_${userId}`;
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error('Error getting upvoted reports:', error);
+    return [];
+  }
+};
+
+/**
+ * Save upvoted report to prevent duplicate upvotes
+ */
+const saveUpvotedReport = (userId: string, reportId: string): void => {
+  try {
+    const key = `upvoted_${userId}`;
+    const upvoted = getUpvotedReports(userId);
+    
+    if (!upvoted.includes(reportId)) {
+      upvoted.push(reportId);
+      localStorage.setItem(key, JSON.stringify(upvoted));
+    }
+  } catch (error) {
+    console.error('Error saving upvoted report:', error);
+  }
+};
+
+// ============================================
+// Updated upvoteReport function in reportsService.ts
+// ============================================
+
+/**
+ * Upvote a report (with user tracking to prevent duplicates)
+ */
+export const upvoteReport = async (
+  reportId: string, 
+  voterId: string
+): Promise<void> => {
+  try {
+    const reportRef = doc(db, 'reports', reportId);
+    const reportSnap = await getDoc(reportRef);
+    
+    if (!reportSnap.exists()) {
+      throw new Error('Report not found');
+    }
+
+    const reportData = reportSnap.data();
+
+    // Increment upvote count
+    await updateDoc(reportRef, {
+      upvotes: increment(1),
+    });
+
+    // Notify report creator (if not the voter)
+    if (reportData.userId && reportData.userId !== voterId) {
+      await createNotification(
+        reportData.userId,
+        'upvote',
+        '👍 New Upvote',
+        'Someone upvoted your report',
+        reportId
+      );
+    }
+    
+    console.log('Report upvoted successfully');
+  } catch (error) {
+    console.error('Error upvoting report:', error);
+    throw error;
+  }
+};
+
 // ============================================
 // Styles
 // ============================================
@@ -640,6 +814,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#007AFF",
+  },
+  actionButtonActive: {
+    backgroundColor: '#007AFF',
+    borderWidth: 1,
+    borderColor: '#007AFF',
+  },
+  actionButtonTextActive: {
+    color: '#fff',
   },
   anonymousBanner: {
     position: "absolute",
@@ -933,3 +1115,14 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
 });
+
+const additionalStyles = {
+  actionButtonActive: {
+    backgroundColor: '#007AFF',
+    borderWidth: 1,
+    borderColor: '#007AFF',
+  },
+  actionButtonTextActive: {
+    color: '#fff',
+  },
+};
