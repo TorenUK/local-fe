@@ -1,10 +1,21 @@
-// services/storageService.ts - Complete Storage Service
+import * as ImageManipulator from 'expo-image-manipulator';
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { storage } from '../firebase/config';
 
-/**
- * Upload profile photo to Firebase Storage
- */
+const compressImage = async (uri: string): Promise<Blob> => {
+  // Resize and compress
+  const manipulatedImage = await ImageManipulator.manipulateAsync(
+    uri,
+    [{ resize: { width: 1080 } }], 
+    { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG } 
+  );
+
+  // Convert to blob
+  const response = await fetch(manipulatedImage.uri);
+  const blob = await response.blob();
+  return blob;
+};
+
 export const uploadProfilePhoto = async (
   photoUri: string,
   userId: string
@@ -13,11 +24,8 @@ export const uploadProfilePhoto = async (
     const filename = `profiles/${userId}.jpg`;
     const storageRef = ref(storage, filename);
 
-    // Convert URI to blob
-    const response = await fetch(photoUri);
-    const blob = await response.blob();
+    const blob = await compressImage(photoUri);
 
-    // Upload to Firebase Storage
     await uploadBytes(storageRef, blob);
 
     // Get download URL
@@ -30,9 +38,6 @@ export const uploadProfilePhoto = async (
   }
 };
 
-/**
- * Upload photos for a report (multiple)
- */
 export const uploadReportPhotos = async (photoUris: string[]): Promise<string[]> => {
   try {
     const uploadPromises = photoUris.map(async (uri, index) => {
@@ -41,11 +46,8 @@ export const uploadReportPhotos = async (photoUris: string[]): Promise<string[]>
       const filename = `reports/${timestamp}_${index}.jpg`;
       const storageRef = ref(storage, filename);
 
-      // Convert URI to blob
-      const response = await fetch(uri);
-      const blob = await response.blob();
+      const blob = await compressImage(uri);
 
-      // Upload to Firebase Storage
       await uploadBytes(storageRef, blob);
 
       // Get download URL
@@ -62,9 +64,6 @@ export const uploadReportPhotos = async (photoUris: string[]): Promise<string[]>
   }
 };
 
-/**
- * Delete a photo from storage
- */
 export const deletePhoto = async (photoUrl: string): Promise<void> => {
   try {
     const photoRef = ref(storage, photoUrl);
@@ -76,9 +75,6 @@ export const deletePhoto = async (photoUrl: string): Promise<void> => {
   }
 };
 
-/**
- * Delete multiple photos
- */
 export const deletePhotos = async (photoUrls: string[]): Promise<void> => {
   try {
     const deletePromises = photoUrls.map((url) => deletePhoto(url));
