@@ -7,7 +7,7 @@ const compressImage = async (uri: string): Promise<Blob> => {
   const manipulatedImage = await ImageManipulator.manipulateAsync(
     uri,
     [{ resize: { width: 1080 } }], 
-    { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG } 
+    { compress: 0.4, format: ImageManipulator.SaveFormat.JPEG } 
   );
 
   // Convert to blob
@@ -61,6 +61,30 @@ export const uploadReportPhotos = async (photoUris: string[]): Promise<string[]>
   } catch (error) {
     console.error('Error uploading report photos:', error);
     throw new Error('Failed to upload photos');
+  }
+};
+
+export const uploadPostPhotos = async (photoUris: string[], userId: string): Promise<string[]> => {
+  try {
+    const uploadPromises = photoUris.map(async (uri, index) => {
+      const timestamp = Date.now();
+      const filename = `posts/${userId}/${timestamp}_${index}.jpg`;
+      const storageRef = ref(storage, filename);
+
+      const blob = await compressImage(uri);
+
+      await uploadBytes(storageRef, blob);
+
+      const downloadURL = await getDownloadURL(storageRef);
+      return downloadURL;
+    });
+
+    const downloadURLs = await Promise.all(uploadPromises);
+    console.log('Post photos uploaded successfully');
+    return downloadURLs;
+  } catch (error) {
+    console.error('Error uploading post photos:', error);
+    throw new Error('Failed to upload post photos');
   }
 };
 
