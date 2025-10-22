@@ -1,14 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   ActivityIndicator,
   Alert,
   Modal,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Switch,
@@ -24,6 +25,7 @@ import {
   signOut as authSignOut,
   changeEmail,
   changePassword,
+  getUserProfile,
   linkAnonymousWithEmail,
   sendVerificationEmail,
   updateUserDisplayProfile,
@@ -32,9 +34,11 @@ import {
 import { uploadProfilePhoto } from '../../services/storageService';
 
 export default function ProfileScreen() {
-  const { user, userProfile, isAuthenticated } = useAuth();
+  const { user, userProfile: contextUserProfile, isAuthenticated } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [localUserProfile, setLocalUserProfile] = useState(contextUserProfile);
 
   const colorScheme = useColorScheme(); 
   const backgroundColor = colorScheme === 'dark' ? '#000' : '#fff';
@@ -45,7 +49,39 @@ export default function ProfileScreen() {
   const [showChangeEmail, setShowChangeEmail] = useState(false);
   const [showLinkAccount, setShowLinkAccount] = useState(false);
 
-  // --- Helpers for Alert callbacks that must be synchronous in signature ---
+  // Fetch fresh user profile data
+  const fetchUserProfile = async () => {
+    if (!user) return;
+    
+    try {
+      const freshProfile = await getUserProfile(user.uid);
+      setLocalUserProfile(freshProfile);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
+  // Update local profile when context changes
+  useEffect(() => {
+    setLocalUserProfile(contextUserProfile);
+  }, [contextUserProfile]);
+
+  // Refresh profile on screen focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        fetchUserProfile();
+      }
+    }, [user])
+  );
+
+  // Pull to refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchUserProfile();
+    setRefreshing(false);
+  };
+
   const signOutHandler = async () => {
     try {
       await authSignOut();
@@ -65,7 +101,6 @@ export default function ProfileScreen() {
           text: 'Sign Out',
           style: 'destructive',
           onPress: () => {
-            // call async helper, don't `await` here
             void signOutHandler();
           },
         },
@@ -130,13 +165,12 @@ export default function ProfileScreen() {
         quality: 0.5,
       });
 
-
-      // Expo ImagePicker v14+ returns { canceled, assets }
       if (!result.canceled && result.assets?.[0]?.uri && user) {
         setLoading(true);
         const photoUrl = await uploadProfilePhoto(result.assets[0].uri, user.uid);
         await updateUserDisplayProfile({ photoUrl });
         Alert.alert('Success', 'Profile photo updated!');
+        await fetchUserProfile();
       }
     } catch (error: any) {
       Alert.alert('Error', error.message);
@@ -150,12 +184,13 @@ export default function ProfileScreen() {
       if (!user) return;
       await updateUserProfile(user.uid, {
         settings: {
-          ...userProfile?.settings,
+          ...localUserProfile?.settings,
           notificationsEnabled: value,
-          emailNotifications: userProfile?.settings?.emailNotifications ?? true,
-          alertRadius: userProfile?.settings?.alertRadius ?? 5,
+          emailNotifications: localUserProfile?.settings?.emailNotifications ?? true,
+          alertRadius: localUserProfile?.settings?.alertRadius ?? 5,
         },
       });
+      await fetchUserProfile();
     } catch (error: any) {
       Alert.alert('Error', error.message);
     }
@@ -166,21 +201,21 @@ export default function ProfileScreen() {
       if (!user) return;
       await updateUserProfile(user.uid, {
         settings: {
-          ...userProfile?.settings,
+          ...localUserProfile?.settings,
           emailNotifications: value,
-          alertRadius: userProfile?.settings?.alertRadius ?? 5,
-          notificationsEnabled: userProfile?.settings?.notificationsEnabled ?? true,
+          alertRadius: localUserProfile?.settings?.alertRadius ?? 5,
+          notificationsEnabled: localUserProfile?.settings?.notificationsEnabled ?? true,
         },
       });
+      await fetchUserProfile();
     } catch (error: any) {
       Alert.alert('Error', error.message);
     }
   };
 
-  // --- Alert.prompt fix: use sync onPress that calls async helper ---
   const handleSaveRadius = async (value?: string) => {
-    if (!user || !userProfile) return;
-    const radius = parseInt(value ?? String(userProfile?.settings?.alertRadius ?? 5), 10);
+    if (!user || !localUserProfile) return;
+    const radius = parseInt(value ?? String(localUserProfile?.settings?.alertRadius ?? 5), 10);
     if (isNaN(radius) || radius < 1 || radius > 50) {
       Alert.alert('Error', 'Please enter a number between 1 and 50');
       return;
@@ -188,23 +223,22 @@ export default function ProfileScreen() {
     try {
       await updateUserProfile(user.uid, {
         settings: {
-          ...userProfile?.settings,
-          notificationsEnabled: userProfile?.settings?.notificationsEnabled ?? true,
-          emailNotifications: userProfile?.settings?.emailNotifications ?? true,
+          ...localUserProfile?.settings,
+          notificationsEnabled: localUserProfile?.settings?.notificationsEnabled ?? true,
+          emailNotifications: localUserProfile?.settings?.emailNotifications ?? true,
           alertRadius: radius,
         },
       });
       Alert.alert('Success', `Alert radius set to ${radius}km`);
+      await fetchUserProfile();
     } catch (error: any) {
       Alert.alert('Error', error.message);
     }
   };
 
   const handleAlertRadiusChange = () => {
-    if (!user || !userProfile) return;
+    if (!user || !localUserProfile) return;
 
-    // Alert.prompt is iOS-only; TypeScript requires the onPress to be (value?: string) => void
-    // so we pass a synchronous function that calls an async helper.
     if (Platform.OS === 'ios') {
       Alert.prompt(
         'Alert Radius',
@@ -219,12 +253,9 @@ export default function ProfileScreen() {
           },
         ],
         'plain-text',
-        String(userProfile?.settings?.alertRadius ?? 5)
+        String(localUserProfile?.settings?.alertRadius ?? 5)
       );
     } else {
-      // Android: Alert.prompt isn't available. Use a simple workaround: show a confirm alert that opens an in-app modal
-      // For now we fall back to a simple two-step prompt: inform users they must change this in settings screen (or implement custom modal)
-      // You can replace this with a custom modal implementation to accept input on Android.
       Alert.alert(
         'Change Alert Radius',
         'Changing alert radius is currently supported on iOS via a prompt. On Android please use the settings screen (or implement a custom modal).',
@@ -249,7 +280,13 @@ export default function ProfileScreen() {
   }
 
   return (
-    <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+    <ScrollView 
+      style={styles.scrollView} 
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       {/* Profile Header */}
       <View style={styles.header}>
         <View style={styles.avatarContainer}>
@@ -273,7 +310,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.name}>{userProfile?.name || 'User'}</Text>
+        <Text style={styles.name}>{localUserProfile?.name || user.displayName || 'User'}</Text>
         {user.email && <Text style={styles.email}>{user.email}</Text>}
 
         {user.isAnonymous && (
@@ -302,14 +339,14 @@ export default function ProfileScreen() {
       <View style={styles.statsContainer}>
         <View style={styles.statBox}>
           <Text style={styles.statNumber}>
-            {userProfile?.createdReports?.length || 0}
+            {localUserProfile?.createdReports?.length || 0}
           </Text>
           <Text style={styles.statLabel}>Reports</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statBox}>
           <Text style={styles.statNumber}>
-            {userProfile?.trackedReports?.length || 0}
+            {localUserProfile?.trackedReports?.length || 0}
           </Text>
           <Text style={styles.statLabel}>Tracking</Text>
         </View>
@@ -367,7 +404,7 @@ export default function ProfileScreen() {
             <Text style={styles.menuItemText}>Push Notifications</Text>
           </View>
           <Switch
-            value={userProfile?.settings?.notificationsEnabled ?? true}
+            value={localUserProfile?.settings?.notificationsEnabled ?? true}
             onValueChange={toggleNotifications}
             trackColor={{ false: '#E5E5EA', true: '#34C759' }}
             thumbColor="#fff"
@@ -381,7 +418,7 @@ export default function ProfileScreen() {
               <Text style={styles.menuItemText}>Email Notifications</Text>
             </View>
             <Switch
-              value={userProfile?.settings?.emailNotifications ?? true}
+              value={localUserProfile?.settings?.emailNotifications ?? true}
               onValueChange={toggleEmailNotifications}
               trackColor={{ false: '#E5E5EA', true: '#34C759' }}
               thumbColor="#fff"
@@ -399,7 +436,7 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.menuItemRight}>
             <Text style={styles.menuItemValue}>
-              {userProfile?.settings?.alertRadius ?? 5} km
+              {localUserProfile?.settings?.alertRadius ?? 5} km
             </Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </View>
@@ -455,8 +492,11 @@ export default function ProfileScreen() {
       {/* Modals */}
       <EditProfileModal
         visible={showEditProfile}
-        onClose={() => setShowEditProfile(false)}
-        currentName={userProfile?.name ?? ''}
+        onClose={() => {
+          setShowEditProfile(false);
+          fetchUserProfile();
+        }}
+        currentName={localUserProfile?.name ?? ''}
       />
 
       <ChangePasswordModal
@@ -466,13 +506,19 @@ export default function ProfileScreen() {
 
       <ChangeEmailModal
         visible={showChangeEmail}
-        onClose={() => setShowChangeEmail(false)}
+        onClose={() => {
+          setShowChangeEmail(false);
+          fetchUserProfile();
+        }}
         currentEmail={user.email ?? ''}
       />
 
       <LinkAccountModal
         visible={showLinkAccount}
-        onClose={() => setShowLinkAccount(false)}
+        onClose={() => {
+          setShowLinkAccount(false);
+          fetchUserProfile();
+        }}
       />
     </ScrollView>
   );
@@ -489,9 +535,15 @@ interface EditProfileModalProps {
 
 function EditProfileModal({ visible, onClose, currentName }: EditProfileModalProps) {
   const [loading, setLoading] = useState(false);
-  const { control, handleSubmit, formState: { errors } } = useForm({
+  const { control, handleSubmit, formState: { errors }, reset } = useForm({
     defaultValues: { name: currentName },
   });
+
+  useEffect(() => {
+    if (visible) {
+      reset({ name: currentName });
+    }
+  }, [visible, currentName]);
 
   const onSubmit = async (data: { name: string }) => {
     try {
@@ -568,13 +620,23 @@ interface ChangePasswordModalProps {
 
 function ChangePasswordModal({ visible, onClose }: ChangePasswordModalProps) {
   const [loading, setLoading] = useState(false);
-  const { control, handleSubmit, watch, formState: { errors } } = useForm({
+  const { control, handleSubmit, watch, formState: { errors }, reset } = useForm({
     defaultValues: {
       currentPassword: '',
       newPassword: '',
       confirmPassword: '',
     },
   });
+
+  useEffect(() => {
+    if (visible) {
+      reset({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+    }
+  }, [visible]);
 
   const newPassword = watch('newPassword');
 
@@ -701,12 +763,21 @@ interface ChangeEmailModalProps {
 
 function ChangeEmailModal({ visible, onClose, currentEmail }: ChangeEmailModalProps) {
   const [loading, setLoading] = useState(false);
-  const { control, handleSubmit, formState: { errors } } = useForm({
+  const { control, handleSubmit, formState: { errors }, reset } = useForm({
     defaultValues: {
       newEmail: '',
       password: '',
     },
   });
+
+  useEffect(() => {
+    if (visible) {
+      reset({
+        newEmail: '',
+        password: '',
+      });
+    }
+  }, [visible]);
 
   const onSubmit = async (data: any) => {
     try {
@@ -818,7 +889,7 @@ interface LinkAccountModalProps {
 
 function LinkAccountModal({ visible, onClose }: LinkAccountModalProps) {
   const [loading, setLoading] = useState(false);
-  const { control, handleSubmit, watch, formState: { errors } } = useForm({
+  const { control, handleSubmit, watch, formState: { errors }, reset } = useForm({
     defaultValues: {
       name: '',
       email: '',
@@ -826,6 +897,17 @@ function LinkAccountModal({ visible, onClose }: LinkAccountModalProps) {
       confirmPassword: '',
     },
   });
+
+  useEffect(() => {
+    if (visible) {
+      reset({
+        name: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+      });
+    }
+  }, [visible]);
 
   const password = watch('password');
 
@@ -971,7 +1053,6 @@ function LinkAccountModal({ visible, onClose }: LinkAccountModalProps) {
     </Modal>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
