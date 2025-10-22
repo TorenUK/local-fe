@@ -7,12 +7,15 @@ import {
   doc,
   getDoc,
   increment,
+  Timestamp,
   updateDoc
 } from 'firebase/firestore';
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Dimensions,
   Modal,
   ScrollView,
   StyleSheet,
@@ -30,6 +33,9 @@ import { useReports } from "../../hooks/useReport";
 import { getCurrentPosition } from "../../services/locationService";
 import { trackReport, untrackReport } from '../../services/reportService';
 
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+const DRAWER_HEIGHT = SCREEN_HEIGHT * 0.7;
+
 interface Report {
   id: string;
   type: "crime" | "lost_item" | "missing_pet" | "hazard";
@@ -38,7 +44,7 @@ interface Report {
     latitude: number;
     longitude: number;
   };
-  createdAt: Date;
+  createdAt: Date | Timestamp;
   status: "open" | "resolved";
   userId: string | null;
   upvotes: number;
@@ -67,11 +73,13 @@ export default function MapScreen() {
   const mapRef = useRef<MapView>(null);
   const { user, userProfile } = useAuth();
   const router = useRouter();
+  const drawerAnimation = useRef(new Animated.Value(0)).current;
 
   const [region, setRegion] = useState<Region | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [showDrawer, setShowDrawer] = useState(false);
   const [filters, setFilters] = useState({
     crime: true,
     lost_item: true,
@@ -79,7 +87,6 @@ export default function MapScreen() {
     hazard: true,
   });
 
-  // This will be replaced with real Firestore data
   const { reports, loading: reportsLoading } = useReports(region);
 
   useEffect(() => {
@@ -136,6 +143,17 @@ export default function MapScreen() {
     }
   };
 
+  const toggleDrawer = () => {
+    setShowDrawer(!showDrawer);
+    
+    Animated.spring(drawerAnimation, {
+      toValue: showDrawer ? 0 : 1,
+      useNativeDriver: true,
+      tension: 65,
+      friction: 11,
+    }).start();
+  };
+
   const getMarkerColor = (type: Report["type"]) => {
     switch (type) {
       case "crime":
@@ -166,27 +184,48 @@ export default function MapScreen() {
     }
   };
 
-  // const filteredReports = reports.filter((report) => filters[report.type]);
+  const getTypeLabel = (type: Report["type"]) => {
+    const labels = {
+      crime: "Crime",
+      lost_item: "Lost Item",
+      missing_pet: "Missing Pet",
+      hazard: "Hazard",
+    };
+    return labels[type] || "Report";
+  };
+
   const alertRadiusKm = userProfile?.settings?.alertRadius || 5;
 
-const filteredReports = region
-  ? reports.filter(
-      (report) =>
-        filters[report.type] &&
-        Math.sqrt(
-          Math.pow(
-            (report.location.latitude - region.latitude) * 111,
-            2
-          ) +
-            Math.pow(
-              (report.location.longitude - region.longitude) *
-                111 *
-                Math.cos((region.latitude * Math.PI) / 180),
-              2
-            )
-        ) <= (userProfile?.settings?.alertRadius || 5)
-    )
-  : [];
+  const filteredReports = region
+    ? reports.filter(
+        (report) =>
+          filters[report.type] &&
+          getDistanceFromLatLonInKm(
+            report.location.latitude,
+            report.location.longitude,
+            region.latitude,
+            region.longitude
+          ) <= alertRadiusKm
+      )
+    : [];
+
+  // Sort reports by distance
+  const sortedReports = [...filteredReports].sort((a, b) => {
+    if (!region) return 0;
+    const distA = getDistanceFromLatLonInKm(
+      a.location.latitude,
+      a.location.longitude,
+      region.latitude,
+      region.longitude
+    );
+    const distB = getDistanceFromLatLonInKm(
+      b.location.latitude,
+      b.location.longitude,
+      region.latitude,
+      region.longitude
+    );
+    return distA - distB;
+  });
 
   if (loading || !region) {
     return (
@@ -199,16 +238,28 @@ const filteredReports = region
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Nearby Alerts</Text>
-        <View style={styles.headerRight}>
-          <Text style={styles.reportCount}>
-            {filteredReports.length}{" "}
-            {filteredReports.length === 1 ? "alert" : "alerts"}
-          </Text>
+      {/* Header - Now Clickable */}
+      <TouchableOpacity 
+        style={styles.header}
+        onPress={toggleDrawer}
+        activeOpacity={0.8}
+      >
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Nearby Alerts</Text>
+          <View style={styles.headerRight}>
+            <Text style={styles.reportCount}>
+              {filteredReports.length}{" "}
+              {filteredReports.length === 1 ? "alert" : "alerts"}
+            </Text>
+            <Ionicons 
+              name={showDrawer ? "chevron-up" : "chevron-down"} 
+              size={20} 
+              color="#007AFF" 
+              style={{ marginLeft: 8 }}
+            />
+          </View>
         </View>
-      </View>
+      </TouchableOpacity>
 
       {/* Anonymous User Banner */}
       {user?.isAnonymous && (
@@ -226,48 +277,48 @@ const filteredReports = region
         region={region}
         showsUserLocation
         showsMyLocationButton={false}
-        // provider={PROVIDER_GOOGLE}
-        // onRegionChangeComplete={setRegion}
       >
         {/* User Location Radius */}
         <Circle
           center={{ latitude: region.latitude, longitude: region.longitude }}
-          radius={(userProfile?.settings?.alertRadius || 5) * 1000}
+          radius={alertRadiusKm * 1000}
           fillColor="rgba(0, 122, 255, 0.1)"
           strokeColor="rgba(0, 122, 255, 0.3)"
           strokeWidth={2}
         />
 
         {/* Report Markers */}
-
-        {filteredReports.map((report) => (
-          <Marker
-            key={report.id}
-            coordinate={report.location}
-            onPress={() =>
-              setSelectedReport({
-                ...report,
-                createdAt:
-                  report.createdAt instanceof Date
-                    ? report.createdAt
-                    : report.createdAt.toDate(),
-              })
-            }
-          >
-            <View
-              style={[
-                styles.markerContainer,
-                { backgroundColor: getMarkerColor(report.type) },
-              ]}
+        {filteredReports.map((report) => {
+          const createdAt = report.createdAt instanceof Date 
+            ? report.createdAt 
+            : report.createdAt.toDate();
+            
+          return (
+            <Marker
+              key={report.id}
+              coordinate={report.location}
+              onPress={() =>
+                setSelectedReport({
+                  ...report,
+                  createdAt,
+                })
+              }
             >
-              <Ionicons
-                name={getMarkerIcon(report.type) as any}
-                size={20}
-                color="#fff"
-              />
-            </View>
-          </Marker>
-        ))}
+              <View
+                style={[
+                  styles.markerContainer,
+                  { backgroundColor: getMarkerColor(report.type) },
+                ]}
+              >
+                <Ionicons
+                  name={getMarkerIcon(report.type) as any}
+                  size={20}
+                  color="#fff"
+                />
+              </View>
+            </Marker>
+          );
+        })}
       </MapView>
 
       {/* Floating Action Buttons */}
@@ -292,6 +343,80 @@ const filteredReports = region
         <Ionicons name="add" size={24} color="#fff" />
         <Text style={styles.addButtonText}>Create Alert</Text>
       </TouchableOpacity>
+
+      {/* Alerts Drawer */}
+      {showDrawer && (
+        <Animated.View
+          style={[
+            styles.drawer,
+            {
+              transform: [
+                {
+                  translateY: drawerAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [DRAWER_HEIGHT, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <TouchableOpacity 
+            style={styles.drawerHandle}
+            onPress={toggleDrawer}
+          >
+            <View style={styles.drawerHandleLine} />
+          </TouchableOpacity>
+          
+          <View style={styles.drawerHeader}>
+            <Text style={styles.drawerTitle}>Nearby Alerts</Text>
+            <Text style={styles.drawerSubtitle}>
+              Within {alertRadiusKm}km radius • {sortedReports.length} alerts
+            </Text>
+          </View>
+
+          <ScrollView 
+            style={styles.drawerContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {sortedReports.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="location-outline" size={64} color="#ccc" />
+                <Text style={styles.emptyStateText}>No alerts in your area</Text>
+                <Text style={styles.emptyStateSubtext}>
+                  You'll be notified when new alerts are posted nearby
+                </Text>
+              </View>
+            ) : (
+              sortedReports.map((report) => {
+                const distance = getDistanceFromLatLonInKm(
+                  report.location.latitude,
+                  report.location.longitude,
+                  region.latitude,
+                  region.longitude
+                );
+                
+                return (
+                  <AlertCard
+                    key={report.id}
+                    report={report}
+                    distance={distance}
+                    onPress={() => {
+                      toggleDrawer();
+                      setTimeout(() => {
+                        router.push({ 
+                          pathname: "/report/[id]", 
+                          params: { id: report.id } 
+                        });
+                      }, 300);
+                    }}
+                  />
+                );
+              })
+            )}
+          </ScrollView>
+        </Animated.View>
+      )}
 
       {/* Report Detail Modal */}
       {selectedReport && (
@@ -319,6 +444,104 @@ const filteredReports = region
   );
 }
 
+// Alert Card Component
+interface AlertCardProps {
+  report: Report;
+  distance: number;
+  onPress: () => void;
+}
+
+function AlertCard({ report, distance, onPress }: AlertCardProps) {
+  const getMarkerColor = (type: Report["type"]) => {
+    switch (type) {
+      case "crime": return "#FF3B30";
+      case "lost_item": return "#FF9500";
+      case "missing_pet": return "#34C759";
+      case "hazard": return "#FFCC00";
+      default: return "#007AFF";
+    }
+  };
+
+  const getMarkerIcon = (type: Report["type"]) => {
+    switch (type) {
+      case "crime": return "warning";
+      case "lost_item": return "help-circle";
+      case "missing_pet": return "paw";
+      case "hazard": return "alert-circle";
+      default: return "location";
+    }
+  };
+
+  const getTypeLabel = (type: Report["type"]) => {
+    const labels = {
+      crime: "Crime",
+      lost_item: "Lost Item",
+      missing_pet: "Missing Pet",
+      hazard: "Hazard",
+    };
+    return labels[type] || "Report";
+  };
+
+  return (
+    <TouchableOpacity style={styles.alertCard} onPress={onPress}>
+      <View style={[styles.alertIcon, { backgroundColor: getMarkerColor(report.type) }]}>
+        <Ionicons name={getMarkerIcon(report.type) as any} size={24} color="#fff" />
+      </View>
+      
+      <View style={styles.alertContent}>
+        <View style={styles.alertHeader}>
+          <Text style={styles.alertType}>{getTypeLabel(report.type)}</Text>
+          <View style={styles.alertDistance}>
+            <Ionicons name="location" size={14} color="#666" />
+            <Text style={styles.alertDistanceText}>
+              {distance < 0.1 ? '<100m' : `${distance.toFixed(1)}km`}
+            </Text>
+          </View>
+        </View>
+        
+        <Text style={styles.alertDescription} numberOfLines={2}>
+          {report.description}
+        </Text>
+        
+        <View style={styles.alertFooter}>
+          <View style={[
+            styles.alertStatus,
+            report.status === "open" ? styles.alertStatusOpen : styles.alertStatusResolved
+          ]}>
+            <View style={[
+              styles.alertStatusDot,
+              { backgroundColor: report.status === "open" ? "#34C759" : "#8E8E93" }
+            ]} />
+            <Text style={styles.alertStatusText}>
+              {report.status === "open" ? "Active" : "Resolved"}
+            </Text>
+          </View>
+          
+          <Text style={styles.alertTime}>
+            {getTimeAgo(report.createdAt)}
+          </Text>
+        </View>
+      </View>
+      
+      <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+    </TouchableOpacity>
+  );
+}
+
+// Helper function for time ago
+function getTimeAgo(date: Date | Timestamp): string {
+  const actualDate = date instanceof Date ? date : date.toDate();
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - actualDate.getTime()) / 1000);
+  
+  if (seconds < 60) return 'Just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+  return actualDate.toLocaleDateString();
+}
+
+// Filter Modal Component
 interface FilterModalProps {
   visible: boolean;
   filters: {
@@ -343,18 +566,8 @@ function FilterModal({ visible, filters, onClose, onApply }: FilterModalProps) {
 
   const filterOptions = [
     { key: "crime", label: "Crime Reports", icon: "warning", color: "#FF3B30" },
-    {
-      key: "lost_item",
-      label: "Lost Items",
-      icon: "help-circle",
-      color: "#FF9500",
-    },
-    {
-      key: "missing_pet",
-      label: "Missing Pets",
-      icon: "paw",
-      color: "#34C759",
-    },
+    { key: "lost_item", label: "Lost Items", icon: "help-circle", color: "#FF9500" },
+    { key: "missing_pet", label: "Missing Pets", icon: "paw", color: "#34C759" },
     { key: "hazard", label: "Hazards", icon: "alert-circle", color: "#FFCC00" },
   ];
 
@@ -370,23 +583,13 @@ function FilterModal({ visible, filters, onClose, onApply }: FilterModalProps) {
   const handleReset = () => {
     const resetFilters = Object.keys(localFilters).reduce(
       (acc, key) => ({ ...acc, [key]: true }),
-      {} as {
-        crime: boolean;
-        lost_item: boolean;
-        missing_pet: boolean;
-        hazard: boolean;
-      }
+      {} as typeof filters
     );
     setLocalFilters(resetFilters);
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.filterModalContent}>
           <View style={styles.modalHeader}>
@@ -407,25 +610,15 @@ function FilterModal({ visible, filters, onClose, onApply }: FilterModalProps) {
                 onPress={() => handleToggle(option.key as FilterKey)}
               >
                 <View style={styles.filterOptionLeft}>
-                  <View
-                    style={[
-                      styles.filterIcon,
-                      { backgroundColor: option.color },
-                    ]}
-                  >
-                    <Ionicons
-                      name={option.icon as any}
-                      size={20}
-                      color="#fff"
-                    />
+                  <View style={[styles.filterIcon, { backgroundColor: option.color }]}>
+                    <Ionicons name={option.icon as any} size={20} color="#fff" />
                   </View>
                   <Text style={styles.filterLabel}>{option.label}</Text>
                 </View>
                 <View
                   style={[
                     styles.checkbox,
-                    localFilters[option.key as FilterKey] &&
-                      styles.checkboxChecked,
+                    localFilters[option.key as FilterKey] && styles.checkboxChecked,
                   ]}
                 >
                   {localFilters[option.key as FilterKey] && (
@@ -457,16 +650,12 @@ function FilterModal({ visible, filters, onClose, onApply }: FilterModalProps) {
   );
 }
 
-// Report Detail Modal
-
+// Report Detail Modal Component
 interface ReportDetailModalProps {
   report: Report;
   onClose: () => void;
 }
 
-/**
- * Get list of reports user has upvoted (React Native version)
- */
 const getUpvotedReportsRN = async (userId: string): Promise<string[]> => {
   try {
     const key = `upvoted_${userId}`;
@@ -478,9 +667,6 @@ const getUpvotedReportsRN = async (userId: string): Promise<string[]> => {
   }
 };
 
-/**
- * Save upvoted report (React Native version)
- */
 const saveUpvotedReportRN = async (userId: string, reportId: string): Promise<void> => {
   try {
     const key = `upvoted_${userId}`;
@@ -504,14 +690,12 @@ function ReportDetailModalComplete({ report, onClose }: ReportDetailModalProps) 
   const [actionLoading, setActionLoading] = useState(false);
   const [localUpvotes, setLocalUpvotes] = useState(report.upvotes);
 
-  // Check if user is tracking
   useEffect(() => {
     if (userProfile && report) {
       setIsTracking(userProfile.trackedReports?.includes(report.id) || false);
     }
   }, [userProfile, report]);
 
-  // Check if user has upvoted (async for RN)
   useEffect(() => {
     const checkUpvoted = async () => {
       if (user) {
@@ -632,7 +816,11 @@ function ReportDetailModalComplete({ report, onClose }: ReportDetailModalProps) 
 
             <View style={styles.modalSection}>
               <Text style={styles.modalLabel}>Reported</Text>
-              <Text style={styles.modalText}>{new Date(report.createdAt).toLocaleString()}</Text>
+              <Text style={styles.modalText}>
+                {report.createdAt instanceof Date 
+                  ? report.createdAt.toLocaleString() 
+                  : report.createdAt.toDate().toLocaleString()}
+              </Text>
             </View>
 
             <View style={styles.modalActions}>
@@ -681,48 +869,6 @@ function ReportDetailModalComplete({ report, onClose }: ReportDetailModalProps) 
   );
 }
 
-// ============================================
-// Helper Functions for Upvote Tracking
-// ============================================
-
-/**
- * Get list of reports user has upvoted (from AsyncStorage)
- */
-const getUpvotedReports = (userId: string): string[] => {
-  try {
-    const key = `upvoted_${userId}`;
-    const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : [];
-  } catch (error) {
-    console.error('Error getting upvoted reports:', error);
-    return [];
-  }
-};
-
-/**
- * Save upvoted report to prevent duplicate upvotes
- */
-const saveUpvotedReport = (userId: string, reportId: string): void => {
-  try {
-    const key = `upvoted_${userId}`;
-    const upvoted = getUpvotedReports(userId);
-    
-    if (!upvoted.includes(reportId)) {
-      upvoted.push(reportId);
-      localStorage.setItem(key, JSON.stringify(upvoted));
-    }
-  } catch (error) {
-    console.error('Error saving upvoted report:', error);
-  }
-};
-
-// ============================================
-// Updated upvoteReport function in reportsService.ts
-// ============================================
-
-/**
- * Upvote a report (with user tracking to prevent duplicates)
- */
 export const upvoteReport = async (
   reportId: string, 
   voterId: string
@@ -737,12 +883,10 @@ export const upvoteReport = async (
 
     const reportData = reportSnap.data();
 
-    // Increment upvote count
     await updateDoc(reportRef, {
       upvotes: increment(1),
     });
 
-    // Notify report creator (if not the voter)
     if (reportData.userId && reportData.userId !== voterId) {
       await createNotification(
         reportData.userId,
@@ -752,17 +896,12 @@ export const upvoteReport = async (
         reportId
       );
     }
-    
-    console.log('Report upvoted successfully');
   } catch (error) {
     console.error('Error upvoting report:', error);
     throw error;
   }
 };
 
-// ============================================
-// Styles
-// ============================================
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -791,14 +930,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  headerContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: 18,
@@ -813,6 +954,156 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#007AFF",
+  },
+  drawer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: DRAWER_HEIGHT,
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 10,
+    zIndex: 100,
+  },
+  drawerHandle: {
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  drawerHandleLine: {
+    width: 40,
+    height: 4,
+    backgroundColor: "#E5E5EA",
+    borderRadius: 2,
+  },
+  drawerHeader: {
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F2F2F7",
+  },
+  drawerTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#000",
+    marginBottom: 4,
+  },
+  drawerSubtitle: {
+    fontSize: 14,
+    color: "#666",
+  },
+  drawerContent: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#666",
+    marginTop: 16,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: "#999",
+    marginTop: 8,
+    textAlign: "center",
+    paddingHorizontal: 40,
+  },
+  alertCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: "#E5E5EA",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  alertIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  alertContent: {
+    flex: 1,
+  },
+  alertHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  alertType: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#000",
+  },
+  alertDistance: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  alertDistanceText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#666",
+  },
+  alertDescription: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  alertFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  alertStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  alertStatusOpen: {
+    backgroundColor: "#E8FCEB",
+  },
+  alertStatusResolved: {
+    backgroundColor: "#F2F2F7",
+  },
+  alertStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  alertStatusText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#000",
+  },
+  alertTime: {
+    fontSize: 12,
+    color: "#999",
   },
   actionButtonActive: {
     backgroundColor: '#007AFF',
@@ -1116,14 +1407,3 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
 });
-
-const additionalStyles = {
-  actionButtonActive: {
-    backgroundColor: '#007AFF',
-    borderWidth: 1,
-    borderColor: '#007AFF',
-  },
-  actionButtonTextActive: {
-    color: '#fff',
-  },
-};
