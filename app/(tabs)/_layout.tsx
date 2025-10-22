@@ -100,7 +100,20 @@ export default function TabsLayout() {
           ),
         }}
       />
-
+            <Tabs.Screen
+        name="feed"
+        options={{
+          header: () => null,
+          title: "Feed",
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? "list" : "list-outline"}
+              size={size}
+              color={color}
+            />
+          ),
+                }}
+      />
     </Tabs>
   );
 }
