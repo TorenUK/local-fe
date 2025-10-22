@@ -45,13 +45,13 @@ The initial release targets the **general public**, with potential future expans
 - Gamification (badges for community contribution)  
 - Local zone chat  
 
----
+--- 
 
 ### 🚫 Won’t Have (Initially)
 
 - Law enforcement integrations  
 - AI-driven content moderation or recognition  
-
+- Local advertisements  
 ---
 
 ## Method
