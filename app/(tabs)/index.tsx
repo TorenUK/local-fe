@@ -1,15 +1,15 @@
 import { db } from "@/firebase/config";
 import { createNotification } from "@/services/notificationService";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import {
   doc,
   getDoc,
   increment,
   Timestamp,
-  updateDoc
-} from 'firebase/firestore';
+  updateDoc,
+} from "firebase/firestore";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -23,15 +23,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import MapView, {
-  Circle,
-  Marker,
-  Region
-} from "react-native-maps";
+import MapView, { Circle, Marker, Region } from "react-native-maps";
 import { useAuth } from "../../hooks/useAuth";
 import { useReports } from "../../hooks/useReport";
 import { getCurrentPosition } from "../../services/locationService";
-import { trackReport, untrackReport } from '../../services/reportService';
+import { trackReport, untrackReport } from "../../services/reportService";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const DRAWER_HEIGHT = SCREEN_HEIGHT * 0.7;
@@ -145,7 +141,7 @@ export default function MapScreen() {
 
   const toggleDrawer = () => {
     setShowDrawer(!showDrawer);
-    
+
     Animated.spring(drawerAnimation, {
       toValue: showDrawer ? 0 : 1,
       useNativeDriver: true,
@@ -239,7 +235,7 @@ export default function MapScreen() {
   return (
     <View style={styles.container}>
       {/* Header - Now Clickable */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.header}
         onPress={toggleDrawer}
         activeOpacity={0.8}
@@ -251,10 +247,10 @@ export default function MapScreen() {
               {filteredReports.length}{" "}
               {filteredReports.length === 1 ? "alert" : "alerts"}
             </Text>
-            <Ionicons 
-              name={showDrawer ? "chevron-up" : "chevron-down"} 
-              size={20} 
-              color="#007AFF" 
+            <Ionicons
+              name={showDrawer ? "chevron-up" : "chevron-down"}
+              size={20}
+              color="#007AFF"
               style={{ marginLeft: 8 }}
             />
           </View>
@@ -289,10 +285,19 @@ export default function MapScreen() {
 
         {/* Report Markers */}
         {filteredReports.map((report) => {
-          const createdAt = report.createdAt instanceof Date 
-            ? report.createdAt 
-            : report.createdAt.toDate();
-            
+          let createdAt: Date;
+
+          if (report.createdAt instanceof Date) {
+            createdAt = report.createdAt;
+          } else if (
+            report.createdAt &&
+            typeof (report.createdAt as any).toDate === "function"
+          ) {
+            createdAt = (report.createdAt as any).toDate();
+          } else {
+            createdAt = new Date();
+          }
+
           return (
             <Marker
               key={report.id}
@@ -361,13 +366,10 @@ export default function MapScreen() {
             },
           ]}
         >
-          <TouchableOpacity 
-            style={styles.drawerHandle}
-            onPress={toggleDrawer}
-          >
+          <TouchableOpacity style={styles.drawerHandle} onPress={toggleDrawer}>
             <View style={styles.drawerHandleLine} />
           </TouchableOpacity>
-          
+
           <View style={styles.drawerHeader}>
             <Text style={styles.drawerTitle}>Nearby Alerts</Text>
             <Text style={styles.drawerSubtitle}>
@@ -375,14 +377,16 @@ export default function MapScreen() {
             </Text>
           </View>
 
-          <ScrollView 
+          <ScrollView
             style={styles.drawerContent}
             showsVerticalScrollIndicator={false}
           >
             {sortedReports.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="location-outline" size={64} color="#ccc" />
-                <Text style={styles.emptyStateText}>No alerts in your area</Text>
+                <Text style={styles.emptyStateText}>
+                  No alerts in your area
+                </Text>
                 <Text style={styles.emptyStateSubtext}>
                   You'll be notified when new alerts are posted nearby
                 </Text>
@@ -395,7 +399,7 @@ export default function MapScreen() {
                   region.latitude,
                   region.longitude
                 );
-                
+
                 return (
                   <AlertCard
                     key={report.id}
@@ -404,9 +408,9 @@ export default function MapScreen() {
                     onPress={() => {
                       toggleDrawer();
                       setTimeout(() => {
-                        router.push({ 
-                          pathname: "/report/[id]", 
-                          params: { id: report.id } 
+                        router.push({
+                          pathname: "/report/[id]",
+                          params: { id: report.id },
                         });
                       }, 300);
                     }}
@@ -454,21 +458,31 @@ interface AlertCardProps {
 function AlertCard({ report, distance, onPress }: AlertCardProps) {
   const getMarkerColor = (type: Report["type"]) => {
     switch (type) {
-      case "crime": return "#FF3B30";
-      case "lost_item": return "#FF9500";
-      case "missing_pet": return "#34C759";
-      case "hazard": return "#FFCC00";
-      default: return "#007AFF";
+      case "crime":
+        return "#FF3B30";
+      case "lost_item":
+        return "#FF9500";
+      case "missing_pet":
+        return "#34C759";
+      case "hazard":
+        return "#FFCC00";
+      default:
+        return "#007AFF";
     }
   };
 
   const getMarkerIcon = (type: Report["type"]) => {
     switch (type) {
-      case "crime": return "warning";
-      case "lost_item": return "help-circle";
-      case "missing_pet": return "paw";
-      case "hazard": return "alert-circle";
-      default: return "location";
+      case "crime":
+        return "warning";
+      case "lost_item":
+        return "help-circle";
+      case "missing_pet":
+        return "paw";
+      case "hazard":
+        return "alert-circle";
+      default:
+        return "location";
     }
   };
 
@@ -484,45 +498,61 @@ function AlertCard({ report, distance, onPress }: AlertCardProps) {
 
   return (
     <TouchableOpacity style={styles.alertCard} onPress={onPress}>
-      <View style={[styles.alertIcon, { backgroundColor: getMarkerColor(report.type) }]}>
-        <Ionicons name={getMarkerIcon(report.type) as any} size={24} color="#fff" />
+      <View
+        style={[
+          styles.alertIcon,
+          { backgroundColor: getMarkerColor(report.type) },
+        ]}
+      >
+        <Ionicons
+          name={getMarkerIcon(report.type) as any}
+          size={24}
+          color="#fff"
+        />
       </View>
-      
+
       <View style={styles.alertContent}>
         <View style={styles.alertHeader}>
           <Text style={styles.alertType}>{getTypeLabel(report.type)}</Text>
           <View style={styles.alertDistance}>
             <Ionicons name="location" size={14} color="#666" />
             <Text style={styles.alertDistanceText}>
-              {distance < 0.1 ? '<100m' : `${distance.toFixed(1)}km`}
+              {distance < 0.1 ? "<100m" : `${distance.toFixed(1)}km`}
             </Text>
           </View>
         </View>
-        
+
         <Text style={styles.alertDescription} numberOfLines={2}>
           {report.description}
         </Text>
-        
+
         <View style={styles.alertFooter}>
-          <View style={[
-            styles.alertStatus,
-            report.status === "open" ? styles.alertStatusOpen : styles.alertStatusResolved
-          ]}>
-            <View style={[
-              styles.alertStatusDot,
-              { backgroundColor: report.status === "open" ? "#34C759" : "#8E8E93" }
-            ]} />
+          <View
+            style={[
+              styles.alertStatus,
+              report.status === "open"
+                ? styles.alertStatusOpen
+                : styles.alertStatusResolved,
+            ]}
+          >
+            <View
+              style={[
+                styles.alertStatusDot,
+                {
+                  backgroundColor:
+                    report.status === "open" ? "#34C759" : "#8E8E93",
+                },
+              ]}
+            />
             <Text style={styles.alertStatusText}>
               {report.status === "open" ? "Active" : "Resolved"}
             </Text>
           </View>
-          
-          <Text style={styles.alertTime}>
-            {getTimeAgo(report.createdAt)}
-          </Text>
+
+          <Text style={styles.alertTime}>{getTimeAgo(report.createdAt)}</Text>
         </View>
       </View>
-      
+
       <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
     </TouchableOpacity>
   );
@@ -533,8 +563,8 @@ function getTimeAgo(date: Date | Timestamp): string {
   const actualDate = date instanceof Date ? date : date.toDate();
   const now = new Date();
   const seconds = Math.floor((now.getTime() - actualDate.getTime()) / 1000);
-  
-  if (seconds < 60) return 'Just now';
+
+  if (seconds < 60) return "Just now";
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
   if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
@@ -566,8 +596,18 @@ function FilterModal({ visible, filters, onClose, onApply }: FilterModalProps) {
 
   const filterOptions = [
     { key: "crime", label: "Crime Reports", icon: "warning", color: "#FF3B30" },
-    { key: "lost_item", label: "Lost Items", icon: "help-circle", color: "#FF9500" },
-    { key: "missing_pet", label: "Missing Pets", icon: "paw", color: "#34C759" },
+    {
+      key: "lost_item",
+      label: "Lost Items",
+      icon: "help-circle",
+      color: "#FF9500",
+    },
+    {
+      key: "missing_pet",
+      label: "Missing Pets",
+      icon: "paw",
+      color: "#34C759",
+    },
     { key: "hazard", label: "Hazards", icon: "alert-circle", color: "#FFCC00" },
   ];
 
@@ -589,7 +629,12 @@ function FilterModal({ visible, filters, onClose, onApply }: FilterModalProps) {
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <View style={styles.modalOverlay}>
         <View style={styles.filterModalContent}>
           <View style={styles.modalHeader}>
@@ -610,15 +655,25 @@ function FilterModal({ visible, filters, onClose, onApply }: FilterModalProps) {
                 onPress={() => handleToggle(option.key as FilterKey)}
               >
                 <View style={styles.filterOptionLeft}>
-                  <View style={[styles.filterIcon, { backgroundColor: option.color }]}>
-                    <Ionicons name={option.icon as any} size={20} color="#fff" />
+                  <View
+                    style={[
+                      styles.filterIcon,
+                      { backgroundColor: option.color },
+                    ]}
+                  >
+                    <Ionicons
+                      name={option.icon as any}
+                      size={20}
+                      color="#fff"
+                    />
                   </View>
                   <Text style={styles.filterLabel}>{option.label}</Text>
                 </View>
                 <View
                   style={[
                     styles.checkbox,
-                    localFilters[option.key as FilterKey] && styles.checkboxChecked,
+                    localFilters[option.key as FilterKey] &&
+                      styles.checkboxChecked,
                   ]}
                 >
                   {localFilters[option.key as FilterKey] && (
@@ -662,29 +717,35 @@ const getUpvotedReportsRN = async (userId: string): Promise<string[]> => {
     const stored = await AsyncStorage.getItem(key);
     return stored ? JSON.parse(stored) : [];
   } catch (error) {
-    console.error('Error getting upvoted reports:', error);
+    console.error("Error getting upvoted reports:", error);
     return [];
   }
 };
 
-const saveUpvotedReportRN = async (userId: string, reportId: string): Promise<void> => {
+const saveUpvotedReportRN = async (
+  userId: string,
+  reportId: string
+): Promise<void> => {
   try {
     const key = `upvoted_${userId}`;
     const upvoted = await getUpvotedReportsRN(userId);
-    
+
     if (!upvoted.includes(reportId)) {
       upvoted.push(reportId);
       await AsyncStorage.setItem(key, JSON.stringify(upvoted));
     }
   } catch (error) {
-    console.error('Error saving upvoted report:', error);
+    console.error("Error saving upvoted report:", error);
   }
 };
 
-function ReportDetailModalComplete({ report, onClose }: ReportDetailModalProps) {
+function ReportDetailModalComplete({
+  report,
+  onClose,
+}: ReportDetailModalProps) {
   const router = useRouter();
   const { user, userProfile } = useAuth();
-  
+
   const [isTracking, setIsTracking] = useState(false);
   const [hasUpvoted, setHasUpvoted] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -708,12 +769,12 @@ function ReportDetailModalComplete({ report, onClose }: ReportDetailModalProps) 
 
   const handleUpvote = async () => {
     if (!user) {
-      Alert.alert('Sign In Required', 'Please sign in to upvote reports.');
+      Alert.alert("Sign In Required", "Please sign in to upvote reports.");
       return;
     }
 
     if (hasUpvoted) {
-      Alert.alert('Already Upvoted', 'You have already upvoted this report.');
+      Alert.alert("Already Upvoted", "You have already upvoted this report.");
       return;
     }
 
@@ -721,12 +782,12 @@ function ReportDetailModalComplete({ report, onClose }: ReportDetailModalProps) 
       setActionLoading(true);
       await upvoteReport(report.id, user.uid);
       await saveUpvotedReportRN(user.uid, report.id);
-      
+
       setHasUpvoted(true);
-      setLocalUpvotes(prev => prev + 1);
-      Alert.alert('Success', 'Report upvoted!');
+      setLocalUpvotes((prev) => prev + 1);
+      Alert.alert("Success", "Report upvoted!");
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      Alert.alert("Error", error.message);
     } finally {
       setActionLoading(false);
     }
@@ -734,7 +795,7 @@ function ReportDetailModalComplete({ report, onClose }: ReportDetailModalProps) 
 
   const handleTrack = async () => {
     if (!user) {
-      Alert.alert('Sign In Required', 'Please sign in to track reports.');
+      Alert.alert("Sign In Required", "Please sign in to track reports.");
       return;
     }
 
@@ -743,14 +804,14 @@ function ReportDetailModalComplete({ report, onClose }: ReportDetailModalProps) 
       if (isTracking) {
         await untrackReport(user.uid, report.id);
         setIsTracking(false);
-        Alert.alert('Success', 'Report untracked');
+        Alert.alert("Success", "Report untracked");
       } else {
         await trackReport(user.uid, report.id);
         setIsTracking(true);
-        Alert.alert('Success', 'Report tracked! You will receive updates.');
+        Alert.alert("Success", "Report tracked! You will receive updates.");
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      Alert.alert("Error", error.message);
     } finally {
       setActionLoading(false);
     }
@@ -760,7 +821,7 @@ function ReportDetailModalComplete({ report, onClose }: ReportDetailModalProps) 
     onClose();
     router.push({
       pathname: "/report/[id]",
-      params: { id: report.id, scrollTo: 'comments' },
+      params: { id: report.id, scrollTo: "comments" },
     });
   };
 
@@ -785,12 +846,22 @@ function ReportDetailModalComplete({ report, onClose }: ReportDetailModalProps) 
   };
 
   return (
-    <Modal visible={true} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={true}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <View style={styles.modalHeaderLeft}>
-              <View style={[styles.modalTypeIcon, { backgroundColor: getTypeColor(report.type) }]}>
+              <View
+                style={[
+                  styles.modalTypeIcon,
+                  { backgroundColor: getTypeColor(report.type) },
+                ]}
+              >
                 <Ionicons name="warning" size={20} color="#fff" />
               </View>
               <Text style={styles.modalTitle}>{getTypeLabel(report.type)}</Text>
@@ -809,45 +880,82 @@ function ReportDetailModalComplete({ report, onClose }: ReportDetailModalProps) 
             <View style={styles.modalSection}>
               <Text style={styles.modalLabel}>Status</Text>
               <View style={styles.statusBadge}>
-                <View style={[styles.statusDot, { backgroundColor: report.status === "open" ? "#34C759" : "#8E8E93" }]} />
-                <Text style={styles.statusText}>{report.status === "open" ? "Active" : "Resolved"}</Text>
+                <View
+                  style={[
+                    styles.statusDot,
+                    {
+                      backgroundColor:
+                        report.status === "open" ? "#34C759" : "#8E8E93",
+                    },
+                  ]}
+                />
+                <Text style={styles.statusText}>
+                  {report.status === "open" ? "Active" : "Resolved"}
+                </Text>
               </View>
             </View>
 
             <View style={styles.modalSection}>
               <Text style={styles.modalLabel}>Reported</Text>
               <Text style={styles.modalText}>
-                {report.createdAt instanceof Date 
-                  ? report.createdAt.toLocaleString() 
+                {report.createdAt instanceof Date
+                  ? report.createdAt.toLocaleString()
                   : report.createdAt.toDate().toLocaleString()}
               </Text>
             </View>
 
             <View style={styles.modalActions}>
-              <TouchableOpacity 
-                style={[styles.actionButton, hasUpvoted && styles.actionButtonActive]}
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  hasUpvoted && styles.actionButtonActive,
+                ]}
                 onPress={handleUpvote}
                 disabled={actionLoading || hasUpvoted}
               >
-                <Ionicons name={hasUpvoted ? "arrow-up" : "arrow-up-outline"} size={20} color={hasUpvoted ? "#fff" : "#007AFF"} />
-                <Text style={[styles.actionButtonText, hasUpvoted && styles.actionButtonTextActive]}>
-                  {hasUpvoted ? 'Upvoted' : 'Upvote'} ({localUpvotes})
+                <Ionicons
+                  name={hasUpvoted ? "arrow-up" : "arrow-up-outline"}
+                  size={20}
+                  color={hasUpvoted ? "#fff" : "#007AFF"}
+                />
+                <Text
+                  style={[
+                    styles.actionButtonText,
+                    hasUpvoted && styles.actionButtonTextActive,
+                  ]}
+                >
+                  {hasUpvoted ? "Upvoted" : "Upvote"} ({localUpvotes})
                 </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.actionButton} onPress={handleComment}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleComment}
+              >
                 <Ionicons name="chatbubble-outline" size={20} color="#007AFF" />
                 <Text style={styles.actionButtonText}>Comment</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={[styles.actionButton, isTracking && styles.actionButtonActive]}
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  isTracking && styles.actionButtonActive,
+                ]}
                 onPress={handleTrack}
                 disabled={actionLoading}
               >
-                <Ionicons name={isTracking ? "bookmark" : "bookmark-outline"} size={20} color={isTracking ? "#fff" : "#007AFF"} />
-                <Text style={[styles.actionButtonText, isTracking && styles.actionButtonTextActive]}>
-                  {isTracking ? 'Tracking' : 'Track'}
+                <Ionicons
+                  name={isTracking ? "bookmark" : "bookmark-outline"}
+                  size={20}
+                  color={isTracking ? "#fff" : "#007AFF"}
+                />
+                <Text
+                  style={[
+                    styles.actionButtonText,
+                    isTracking && styles.actionButtonTextActive,
+                  ]}
+                >
+                  {isTracking ? "Tracking" : "Track"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -857,7 +965,10 @@ function ReportDetailModalComplete({ report, onClose }: ReportDetailModalProps) 
             style={styles.viewDetailsButton}
             onPress={() => {
               onClose();
-              router.push({ pathname: "/report/[id]", params: { id: report.id } });
+              router.push({
+                pathname: "/report/[id]",
+                params: { id: report.id },
+              });
             }}
           >
             <Text style={styles.viewDetailsButtonText}>View Full Details</Text>
@@ -870,15 +981,15 @@ function ReportDetailModalComplete({ report, onClose }: ReportDetailModalProps) 
 }
 
 export const upvoteReport = async (
-  reportId: string, 
+  reportId: string,
   voterId: string
 ): Promise<void> => {
   try {
-    const reportRef = doc(db, 'reports', reportId);
+    const reportRef = doc(db, "reports", reportId);
     const reportSnap = await getDoc(reportRef);
-    
+
     if (!reportSnap.exists()) {
-      throw new Error('Report not found');
+      throw new Error("Report not found");
     }
 
     const reportData = reportSnap.data();
@@ -890,14 +1001,14 @@ export const upvoteReport = async (
     if (reportData.userId && reportData.userId !== voterId) {
       await createNotification(
         reportData.userId,
-        'upvote',
-        '👍 New Upvote',
-        'Someone upvoted your report',
+        "upvote",
+        "👍 New Upvote",
+        "Someone upvoted your report",
         reportId
       );
     }
   } catch (error) {
-    console.error('Error upvoting report:', error);
+    console.error("Error upvoting report:", error);
     throw error;
   }
 };
@@ -1106,12 +1217,12 @@ const styles = StyleSheet.create({
     color: "#999",
   },
   actionButtonActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: "#007AFF",
   },
   actionButtonTextActive: {
-    color: '#fff',
+    color: "#fff",
   },
   anonymousBanner: {
     position: "absolute",
